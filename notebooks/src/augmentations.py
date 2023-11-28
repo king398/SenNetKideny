@@ -11,7 +11,7 @@ def get_train_transform(DIM) -> Compose:
         ToTensorV2(transpose_mask=True), ])
 
 
-def get_test_transform(DIM) -> Compose:
+def get_valid_transform(DIM) -> Compose:
     return Compose([
         Resize(DIM, DIM),
         ToTensorV2(transpose_mask=True),

@@ -1,0 +1,4 @@
+seed: 42
+train_dir: /home/mithil/PycharmProjects/SenNetKideny/data/train/kidney_1_dense
+valid_dir: /home/mithil/PycharmProjects/SenNetKideny/data/train/kidney_3_sparse
+image_size : 1536
