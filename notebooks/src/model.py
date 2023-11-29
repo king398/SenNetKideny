@@ -8,6 +8,7 @@ def return_model(model_name: str, in_channels: int, classes: int):
         in_channels=in_channels,
         classes=classes,
 
+
     )
     return model
 

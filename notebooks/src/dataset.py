@@ -1,4 +1,3 @@
-import glob
 from torch.utils.data import Dataset
 import cv2
 from albumentations import Compose
@@ -17,7 +16,7 @@ class ImageDataset(Dataset):
 
     def __getitem__(self, item) -> Tuple[torch.Tensor, torch.Tensor]:
         image = cv2.imread(self.image_paths[item])
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         image = (image - image.min()) / (image.max() - image.min() + 0.0001)
         mask = cv2.imread(self.mask_paths[item])
         mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
