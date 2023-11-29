@@ -24,7 +24,5 @@ class ImageDataset(Dataset):
         mask = mask / 255
         augmented = self.transform(image=image, mask=mask)
         image = augmented["image"]
-        mask = augmented["mask"][:, :, None]
+        mask = augmented["mask"][None, :, :, ]
         return image, mask
-
-

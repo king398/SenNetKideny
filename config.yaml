@@ -1,4 +1,13 @@
 seed: 42
 train_dir: /home/mithil/PycharmProjects/SenNetKideny/data/train/kidney_1_dense
-valid_dir: /home/mithil/PycharmProjects/SenNetKideny/data/train/kidney_3_sparse
-image_size : 1536
+validation_dir: /home/mithil/PycharmProjects/SenNetKideny/data/train/kidney_3_sparse
+image_size: 1536
+batch_size: 4
+num_workers: 8
+lr: 0.0003
+model_name: resnet50
+in_channels: 3
+classes: 1
+min_lr: 3e-06
+epochs: 10
+model_dir: /home/mithil/PycharmProjects/SenNetKideny/models/resnet50_baseline

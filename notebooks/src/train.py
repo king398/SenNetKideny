@@ -32,7 +32,7 @@ def main(cfg):
         kwargs_handlers=[DistributedDataParallelKwargs(gradient_as_bucket_view=True, find_unused_parameters=True), ],
         project_dir="logs"
     )
-    accelerate.init_trackers(project_name="google-segmentation", config=cfg)
+    accelerate.init_trackers(project_name="SenNetKidney", config=cfg)
     train_images = os.listdir(f"{cfg['train_dir']}/images/")
     train_images = list(map(lambda x: f"{cfg['train_dir']}/images/{x}", train_images))
     train_masks = list(map(lambda x: x.replace("images", "labels"), train_images))
@@ -46,7 +46,7 @@ def main(cfg):
     valid_loader = DataLoader(valid_dataset, batch_size=cfg['batch_size'], shuffle=False,
                               num_workers=cfg['num_workers'], pin_memory=True)
     model = return_model(cfg['model_name'], in_channels=cfg['in_channels'], classes=cfg['classes'])
-    optimizer = torch.optim.Adam(model.parameters(), lr=cfg['lr'])
+    optimizer = torch.optim.Adam(model.parameters(), lr=float(cfg['lr']))
     scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=int(len(train_loader) * 5),
                                                                      eta_min=float(cfg['min_lr']))
     train_loader, valid_loader, model, optimizer, scheduler = accelerate.prepare(train_loader, valid_loader,
@@ -77,7 +77,7 @@ def main(cfg):
 
         )
         accelerate.wait_for_everyone()
-        if best_dice < best_dice:
+        if dice_score > best_dice:
             best_dice = best_dice
             unwrapped_model = accelerate.unwrap_model(model)
             model_weights = unwrapped_model.state_dict()
