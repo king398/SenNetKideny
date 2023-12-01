@@ -78,7 +78,7 @@ class ImageDataset(Dataset):
         image_shape = image.shape
         image_shape = tuple(str(element) for element in image_shape)
 
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         image = (image - image.min()) / (image.max() - image.min() + 0.0001)
         augmented = self.transform(image=image)
         image = augmented["image"]
@@ -145,7 +145,7 @@ config = {
     "in_channels": 3,
     "classes": 1,
     "test_dir": '/kaggle/input/blood-vessel-segmentation/test',
-    "model_path": "/kaggle/input/senet-models/resnet50_baseline/model.pth",
+    "model_path": "/kaggle/input/senet-models/resnet50_baseline_gray_scale/model.pth",
     "image_size": 1536,
     "batch_size": 2,
     "num_workers": 2,

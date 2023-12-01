@@ -6,6 +6,7 @@ import numpy as np
 import random
 import accelerate
 import yaml
+import cv2
 
 
 class Dice(nn.Module):
@@ -35,3 +36,26 @@ def seed_everything(seed: int) -> None:
 def write_yaml(config: dict, save_path: str) -> None:
     with open(save_path, 'w') as f:
         yaml.dump(config, f, )
+
+def rle_encode(mask):
+    pixel = mask.flatten()
+    pixel = np.concatenate([[0], pixel, [0]])
+    run = np.where(pixel[1:] != pixel[:-1])[0] + 1
+    run[1::2] -= run[::2]
+    rle = ' '.join(str(r) for r in run)
+    if rle == '':
+        rle = '1 0'
+    return rle
+
+
+def remove_small_objects(mask, min_size):
+    # Find all connected components (labels)
+    num_label, label, stats, centroid = cv2.connectedComponentsWithStats(mask, connectivity=8)
+
+    # create a mask where small objects are removed
+    processed = np.zeros_like(mask)
+    for l in range(1, num_label):
+        if stats[l, cv2.CC_STAT_AREA] >= min_size:
+            processed[label == l] = 255
+
+    return processed

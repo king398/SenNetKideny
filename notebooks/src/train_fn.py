@@ -6,7 +6,8 @@ from utils import *
 from torch.nn import Module
 from torch import optim
 from accelerate import Accelerator
-
+from torch.cuda.amp import autocast
+import torch.nn.functional as F
 dice = Dice()
 
 
@@ -74,3 +75,26 @@ def validation_fn(
             accelerator.log({f"valid_loss_{fold}": loss_metric, f"valid_dice_batch_{fold}": dice_batch.item()})
     accelerator.print(f"Epoch:{epoch + 1}, valid_loss: {loss_metric:.5f}, dice: {np.mean(dice_metric):.5f}")
     return np.mean(dice_metric)
+def oof_fn(model: nn.Module, data_loader: DataLoader, device: torch.device, ):
+    torch.cuda.empty_cache()
+    model.eval()
+    rles_list = []
+    image_ids_all = []
+    for i, (images, image_shapes, image_ids) in tqdm(enumerate(data_loader), total=len(data_loader)):
+        images = images.to(device, non_blocking=True).float()
+        with torch.no_grad() and autocast():
+            outputs = model(images).sigmoid().detach().cpu().float()
+        for i, image in enumerate(outputs):
+            output_mask = F.interpolate(image.unsqueeze(0),
+                                        size=(int(image_shapes[0][i]), int(image_shapes[1][i]))).squeeze()
+            output_mask = (output_mask > 0.5).float().numpy()
+            output_mask *= 255
+            output_mask = output_mask.astype(np.uint8)
+            output_mask = remove_small_objects(output_mask, 50)
+            rle_mask = rle_encode(output_mask)
+            rles_list.append(rle_mask)
+            image_ids_all.append(image_ids[i])
+        del outputs, images, output_mask
+        gc.collect()
+
+    return rles_list, image_ids_all

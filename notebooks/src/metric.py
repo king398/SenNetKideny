@@ -157,8 +157,7 @@ def score(
 
     # Check that both are defined or neither are
     if (image_id_column_name is None) != (slice_id_column_name is None):
-        raise ValueError(
-            "If one of `image_id_column_name` or `slice_id_column_name` is given, the other must be given also.")
+        raise ValueError("If one of `image_id_column_name` or `slice_id_column_name` is given, the other must be given also.")
 
     if tolerance < 0.0:
         raise ValueError("`tolerance` must be non-negative.")
@@ -173,6 +172,8 @@ def score(
     joined = solution.join(submission,
                            lsuffix='_sol',
                            rsuffix='_sub')
+
+    del submission
 
     # Compute surface dice for each group of slices and total
     total_dice = 0.0
@@ -770,8 +771,6 @@ _NEIGHBOUR_CODE_TO_NORMALS = [[[0, 0, 0]], [[0.125, 0.125, 0.125]],
                               [[-0.25, -0.25, 0.0], [0.25, 0.25, -0.0]],
                               [[-0.125, -0.125, 0.125]],
                               [[0.125, 0.125, 0.125]], [[0, 0, 0]]]
-
-
 # pylint: enable=line-too-long
 
 
@@ -834,7 +833,7 @@ def create_table_neighbour_code_to_contour_length(spacing_mm):
 
     vertical = spacing_mm[0]
     horizontal = spacing_mm[1]
-    diag = 0.5 * math.sqrt(spacing_mm[0] ** 2 + spacing_mm[1] ** 2)
+    diag = 0.5 * math.sqrt(spacing_mm[0]**2 + spacing_mm[1]**2)
     # pyformat: disable
     neighbour_code_to_contour_length[int("00" "01", 2)] = diag
 
@@ -983,8 +982,11 @@ def _sort_distances_surfels(distances, surfel_areas):
   Returns:
     A tuple of the sorted (distances, surfel_areas).
   """
-    sorted_surfels = np.array(sorted(zip(distances, surfel_areas)))
-    return sorted_surfels[:, 0], sorted_surfels[:, 1]
+    sorted_indices = np.argsort(distances)
+    sorted_distances = distances[sorted_indices]
+    sorted_surfel_areas = surfel_areas[sorted_indices]
+
+    return sorted_distances, sorted_surfel_areas
 
 
 def compute_surface_distances(mask_gt, mask_pred, spacing_mm):
@@ -1134,11 +1136,11 @@ def compute_surface_distances(mask_gt, mask_pred, spacing_mm):
     del neighbour_code_map_pred, surface_area_map_pred, borders_pred
 
     # sort them by distance
-    if distances_gt_to_pred.shape != (0,):
+    if distances_gt_to_pred.shape != (0, ):
         distances_gt_to_pred, surfel_areas_gt = _sort_distances_surfels(
             distances_gt_to_pred, surfel_areas_gt)
 
-    if distances_pred_to_gt.shape != (0,):
+    if distances_pred_to_gt.shape != (0, ):
         distances_pred_to_gt, surfel_areas_pred = _sort_distances_surfels(
             distances_pred_to_gt, surfel_areas_pred)
 
@@ -1213,11 +1215,11 @@ def compute_surface_dice_at_tolerance(surface_distances, tolerance_mm):
 def neighbors(shape):
     dim = len(shape)
     block = generate_binary_structure(dim, 1)
-    block[tuple([1] * dim)] = 0
-    idx = np.where(block > 0)
+    block[tuple([1]*dim)] = 0
+    idx = np.where(block>0)
     idx = np.array(idx, dtype=np.uint8).T
-    idx = np.array(idx - [1] * dim)
-    acc = np.cumprod((1,) + shape[::-1][:-1])
+    idx = np.array(idx-[1]*dim)
+    acc = np.cumprod((1,)+shape[::-1][:-1])
     return np.dot(idx, acc[::-1])
 
 
@@ -1225,50 +1227,49 @@ def neighbors(shape):
 def dist(idx1, idx2, acc):
     dis = 0
     for i in range(len(acc)):
-        c1 = idx1 // acc[i]
-        c2 = idx2 // acc[i]
-        dis += (c1 - c2) ** 2
-        idx1 -= c1 * acc[i]
-        idx2 -= c2 * acc[i]
+        c1 = idx1//acc[i]
+        c2 = idx2//acc[i]
+        dis += (c1-c2)**2
+        idx1 -= c1*acc[i]
+        idx2 -= c2*acc[i]
     return dis
 
 
 @jit(nopython=True)
 def step(dis, pts, roots, s, level, nbs, acc, scale):
     cur = 0
-    while cur < s:
+    while cur<s:
         p = pts[cur]
         rp = roots[cur]
-        if dis[p] == 0xffff or dis[p] > level:
+        if dis[p] == 0xffff or dis[p]>level:
             cur += 1
             continue
         for dp in nbs:
-            cp = p + dp
-            if dis[cp] < level * scale + 2e-10: continue
-            if dis[cp] == 0xffff: continue
+            cp = p+dp
+            if dis[cp]<level*scale+2e-10:continue
+            if dis[cp]==0xffff:continue
             tdist = dist(cp, rp, acc)
-            if tdist < dis[cp] ** 2 - 1e-10:
-                dis[cp] = (tdist ** 0.5) * scale
+            if tdist<dis[cp]**2-1e-10:
+                dis[cp] = (tdist**0.5)*scale
                 pts[s] = cp
                 roots[s] = rp
                 if s == len(pts):
                     s, cur = clear(pts, roots, s, cur)
-                s += 1
+                s+=1
         pts[cur] = -1
-        cur += 1
+        cur+=1
     return cur
 
 
 @jit(nopython=True)
 def clear(pts, roots, s, cur):
-    ns = 0;
-    nc = 0;
+    ns = 0; nc=0;
     for c in range(s):
-        if pts[c] != -1:
+        if pts[c]!=-1:
             pts[ns] = pts[c]
             roots[ns] = roots[c]
             ns += 1
-            if c < cur: nc += 1
+            if c<cur:nc += 1
     return ns, nc
 
 
@@ -1276,9 +1277,9 @@ def clear(pts, roots, s, cur):
 def collect(dis, nbs, pts, root):
     cur = 0
     for p in range(len(dis)):
-        if dis[p] >= 0xffff - 1: continue  # edge or back
+        if dis[p]>=0xffff-1: continue # edge or back
         for dp in nbs:
-            if dis[p + dp] == 0xffff - 1:
+            if dis[p+dp]==0xffff-1:
                 pts[cur] = p
                 root[cur] = p
                 cur += 1
@@ -1289,27 +1290,27 @@ def collect(dis, nbs, pts, root):
 @jit(nopython=True)
 def bufjit(line):
     for i in range(len(line)):
-        line[i] = 1 if line[i] == 0 else 0xffff
+        line[i] = 1 if line[i]==0 else 0xffff
 
 
 def buffer(img, dtype):
-    buf = np.ones(tuple(np.array(img.shape) + 2), dtype=dtype)
-    buf[tuple([slice(1, -1)] * buf.ndim)] = img
+    buf = np.ones(tuple(np.array(img.shape)+2), dtype=dtype)
+    buf[tuple([slice(1,-1)]*buf.ndim)] = img
     bufjit(buf.ravel())
-    buf[tuple([slice(1, -1)] * buf.ndim)] -= 1
+    buf[tuple([slice(1,-1)]*buf.ndim)] -= 1
     return buf
 
 
 def distance_transform_edt(img, output=np.float32, scale=1):
     dis = buffer(img, output)
     nbs = neighbors(dis.shape)
-    acc = np.cumprod((1,) + dis.shape[::-1][:-1])[::-1]
+    acc = np.cumprod((1,)+dis.shape[::-1][:-1])[::-1]
     line = dis.ravel()
-    pts = np.zeros(max(line.size // 4, 1024 ** 2), dtype=np.int64)
-    roots = np.zeros(max(line.size // 4, 1024 ** 2), dtype=np.int64)
+    pts = np.zeros(max(line.size//4, 1024**2), dtype=np.int64)
+    roots = np.zeros(max(line.size//4, 1024**2), dtype=np.int64)
     s = collect(line, nbs, pts, roots)
     for level in range(10000):
         s, c = clear(pts, roots, s, 0)
         s = step(line, pts, roots, s, level, nbs, acc, scale)
-        if s == 0: break
-    return dis[(slice(1, -1),) * img.ndim]
+        if s==0:break
+    return dis[(slice(1,-1),)*img.ndim]
