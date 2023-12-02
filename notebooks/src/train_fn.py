@@ -87,10 +87,10 @@ def oof_fn(model: nn.Module, data_loader: DataLoader, device: torch.device, ):
         for i, image in enumerate(outputs):
             output_mask = F.interpolate(image.unsqueeze(0),
                                         size=(int(image_shapes[0][i]), int(image_shapes[1][i]))).squeeze()
-            output_mask = (output_mask > 0.5).float().numpy()
+            output_mask = (output_mask > 0.25).float().numpy()
             output_mask *= 255
             output_mask = output_mask.astype(np.uint8)
-            output_mask = remove_small_objects(output_mask, 50)
+            output_mask = remove_small_objects(output_mask, 10)
             rle_mask = rle_encode(output_mask)
             rles_list.append(rle_mask)
             image_ids_all.append(image_ids[i])

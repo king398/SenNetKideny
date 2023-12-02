@@ -5,9 +5,9 @@ image_size: 1536
 batch_size: 4
 num_workers: 8
 lr: 0.0003
-model_name: efficientnet-b1
+model_name: tu-seresnext26d_32x4d
 in_channels: 3
 classes: 1
 min_lr: 3e-06
 epochs: 20
-model_dir: /home/mithil/PycharmProjects/SenNetKideny/models/efficientnet-b1_baseline_gray_scale_stack_images
+model_dir: /home/mithil/PycharmProjects/SenNetKideny/models/seresnext26d_32x4d_dice_loss

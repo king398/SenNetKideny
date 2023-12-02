@@ -17,9 +17,8 @@ class ImageDataset(Dataset):
 
     def __getitem__(self, item) -> Tuple[torch.Tensor, torch.Tensor]:
         image = cv2.imread(self.image_paths[item])
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         image = (image - image.min()) / (image.max() - image.min() + 0.0001)
-        image = np.stack([image, image, image], axis=2)
 
         mask = cv2.imread(self.mask_paths[item])
         mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
@@ -28,6 +27,8 @@ class ImageDataset(Dataset):
         image = augmented["image"]
         mask = augmented["mask"][None, :, :, ]
         return image, mask
+
+
 class ImageDatasetOOF(Dataset):
     def __init__(self, image_paths: list, transform: Compose):
         self.image_paths = image_paths

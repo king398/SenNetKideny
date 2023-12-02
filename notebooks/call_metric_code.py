@@ -7,7 +7,7 @@ solution_df.loc[solution_df['id'].str.contains('kidney_3_sparse'), 'width'] = 15
 solution_df.loc[solution_df['id'].str.contains('kidney_3_sparse'), 'height'] = 1706
 solution_df.loc[solution_df['id'].str.contains('kidney_3_sparse'), 'group'] = 'kidney_3_sparse'
 solution_df.loc[solution_df['id'].str.contains('kidney_3_sparse'), 'slice'] = np.arange(len(solution_df))
-model_dir = "efficientnet-b1_baseline_gray_scale_stack_images"
+model_dir = "seresnext26d_32x4d_rgb"
 submission_df = pd.read_csv(f"/home/mithil/PycharmProjects/SenNetKideny/models/{model_dir}/oof.csv")
 print(score(
     solution=solution_df,

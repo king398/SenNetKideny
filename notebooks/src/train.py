@@ -20,7 +20,7 @@ import argparse
 from collections import OrderedDict
 from sklearn.model_selection import KFold
 import cv2
-from segmentation_models_pytorch.losses import SoftBCEWithLogitsLoss
+from segmentation_models_pytorch.losses import DiceLoss
 
 
 def main(cfg):
@@ -53,7 +53,7 @@ def main(cfg):
                                                                                  model,
                                                                                  optimizer, scheduler, )
 
-    criterion = SoftBCEWithLogitsLoss()
+    criterion = DiceLoss(mode="binary")
     best_dice = -1
     for epoch in range(cfg['epochs']):
         train_fn(
