@@ -8,11 +8,13 @@ from torch import optim
 from accelerate import Accelerator
 from torch.cuda.amp import autocast
 import torch.nn.functional as F
+from augmentations import  reverse_padding
 dice = Dice()
 
 
 def train_fn(
         train_loader: DataLoader,
+        train_loader_2: DataLoader,
         model: Module,
         criterion: Module,
         optimizer: optim.Optimizer,
@@ -27,6 +29,7 @@ def train_fn(
     model.train()
     loss_metric = 0
     stream = tqdm(train_loader, total=len(train_loader), disable=not accelerator.is_local_main_process, )
+    stream_2 = tqdm(train_loader_2, total=len(train_loader_2), disable=not accelerator.is_local_main_process, )
 
     for i, (images, masks) in enumerate(stream):
         masks = masks.float()
@@ -44,6 +47,23 @@ def train_fn(
         scheduler.step()
         accelerator.log({f"train_loss_{fold}": loss_metric, f"train_dice_batch_{fold}": dice_batch.item(),
                          f"lr_{fold}": optimizer.param_groups[0]['lr']})
+    for i, (images, masks) in enumerate(stream_2):
+        masks = masks.float()
+        images = images.float()
+        output = model(images)
+        loss = criterion(output, masks)
+        accelerator.backward(loss)
+        optimizer.step()
+        optimizer.zero_grad()
+        outputs, masks = accelerator.gather_for_metrics((output, masks))
+        loss_metric += loss.item() / (i + 1)
+        dice_batch = dice(outputs, masks)
+        stream_2.set_description(
+            f"Epoch:{epoch + 1}, train_loss: {loss_metric:.5f}, dice_batch: {dice_batch.item():.5f}")
+        scheduler.step()
+        accelerator.log({f"train_loss_{fold}": loss_metric, f"train_dice_batch_{fold}": dice_batch.item(),
+                         f"lr_{fold}": optimizer.param_groups[0]['lr']})
+
 
 
 def validation_fn(
@@ -85,13 +105,17 @@ def oof_fn(model: nn.Module, data_loader: DataLoader, device: torch.device, ):
         with torch.no_grad() and autocast():
             outputs = model(images).sigmoid().detach().cpu().float()
         for i, image in enumerate(outputs):
-            output_mask = F.interpolate(image.unsqueeze(0),
-                                        size=(int(image_shapes[0][i]), int(image_shapes[1][i]))).squeeze()
-            output_mask = (output_mask > 0.1).float().numpy()
-            output_mask *= 255
-            output_mask = output_mask.astype(np.uint8)
+            output_mask = (image > 0.15)
+            output_mask = output_mask * 255
+
+            output_mask = output_mask.squeeze(0).numpy().astype(np.uint8)
+
+            output_mask = reverse_padding(output_mask,
+                                          original_height=int(image_shapes[0][i]),
+                                          original_width=int(image_shapes[1][i]))
             output_mask = remove_small_objects(output_mask, 10)
             rle_mask = rle_encode(output_mask)
+
             rles_list.append(rle_mask)
             image_ids_all.append(image_ids[i])
         del outputs, images, output_mask

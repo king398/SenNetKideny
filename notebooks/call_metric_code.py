@@ -19,9 +19,11 @@ score_final = score(
     slice_id_column_name='slice',
 )
 import yaml
+
 with open(f"/home/mithil/PycharmProjects/SenNetKideny/models/{model_dir}/config.yaml") as f:
     cfg = yaml.load(f, Loader=yaml.FullLoader)
-cfg['score'] =  score_final
+cfg['score'] = score_final
 with open(f"/home/mithil/PycharmProjects/SenNetKideny/models/{model_dir}/config.yaml", 'w') as f:
     yaml.dump(cfg, f, )
 
+print(score_final)
