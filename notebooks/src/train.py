@@ -20,7 +20,7 @@ import argparse
 from collections import OrderedDict
 from sklearn.model_selection import KFold
 import cv2
-from segmentation_models_pytorch.losses import DiceLoss
+from segmentation_models_pytorch.losses import SoftBCEWithLogitsLoss
 
 
 def main(cfg):
@@ -28,7 +28,7 @@ def main(cfg):
     seed_everything(cfg['seed'])
     gc.enable()
     accelerate = Accelerator(
-        mixed_precision="fp16", log_with=["wandb", ],
+        mixed_precision="fp16", log_with=["tensorboard", ],
         kwargs_handlers=[DistributedDataParallelKwargs(gradient_as_bucket_view=True, find_unused_parameters=True), ],
         project_dir="logs"
     )
@@ -53,7 +53,7 @@ def main(cfg):
                                                                                  model,
                                                                                  optimizer, scheduler, )
 
-    criterion = DiceLoss(mode="binary")
+    criterion = SoftBCEWithLogitsLoss()
     best_dice = -1
     for epoch in range(cfg['epochs']):
         train_fn(

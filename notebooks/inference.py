@@ -16,6 +16,7 @@ import torch.nn.functional as F
 import glob
 from torch import nn
 import pandas as pd
+from albumentations import CenterCrop
 
 
 # https://www.kaggle.com/competitions/blood-vessel-segmentation/discussion/456033
@@ -43,11 +44,26 @@ def rle_encode(mask):
     return rle
 
 
-def get_valid_transform(DIM) -> Compose:
-    return Compose([
-        Resize(DIM, DIM),
+def get_valid_transform(image, original_height, original_width):
+    """
+    Crops the padded image back to its original dimensions.
+
+    :param image: Padded image.
+    :param original_height: Original height of the image before padding.
+    :param original_width: Original width of the image before padding.
+    :return: Cropped image with original dimensions.
+    """
+    # Define the cropping transformation
+    # round up original height and width to nearest 32
+    original_height = int(np.ceil(original_height / 32) * 32)
+    original_width = int(np.ceil(original_width / 32) * 32)
+    transform = Compose([
+        PadIfNeeded(min_height=original_height, min_width=original_width),
         ToTensorV2(),
     ])
+
+    # Apply the transformation
+    return transform(image=image)['image']
 
 
 def seed_everything(seed: int) -> None:
@@ -63,7 +79,7 @@ def seed_everything(seed: int) -> None:
 
 
 class ImageDataset(Dataset):
-    def __init__(self, image_paths: list, transform: Compose):
+    def __init__(self, image_paths: list, transform):
         self.image_paths = image_paths
         self.transform = transform
 
@@ -78,10 +94,9 @@ class ImageDataset(Dataset):
         image_shape = image.shape
         image_shape = tuple(str(element) for element in image_shape)
 
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         image = (image - image.min()) / (image.max() - image.min() + 0.0001)
-        augmented = self.transform(image=image)
-        image = augmented["image"]
+        image = self.transform(image=image, original_height=int(image_shape[0]), original_width=int(image_shape[1]))
         return image, image_shape, image_id
 
 
@@ -96,6 +111,22 @@ def return_model(model_name: str, in_channels: int, classes: int):
     return model
 
 
+def reverse_padding(image, original_height, original_width):
+    """
+    Crops the padded image back to its original dimensions.
+
+    :param image: Padded image.
+    :param original_height: Original height of the image before padding.
+    :param original_width: Original width of the image before padding.
+    :return: Cropped image with original dimensions.
+    """
+    # Define the cropping transformation
+    transform = CenterCrop(height=original_height, width=original_width)
+
+    # Apply the transformation
+    return transform(image=image)['image']
+
+
 def inference_fn(model: nn.Module, data_loader: DataLoader, device: torch.device, ):
     torch.cuda.empty_cache()
     model.eval()
@@ -106,12 +137,16 @@ def inference_fn(model: nn.Module, data_loader: DataLoader, device: torch.device
         with torch.no_grad() and autocast():
             outputs = model(images).sigmoid().detach().cpu().float()
         for i, image in enumerate(outputs):
-            output_mask = F.interpolate(image.unsqueeze(0),
-                                        size=(int(image_shapes[0][i]), int(image_shapes[1][i]))).squeeze()
-            output_mask = (output_mask > 0.5).float().numpy()
-            output_mask *= 255
-            output_mask = output_mask.astype(np.uint8)
-            output_mask = remove_small_objects(output_mask, 50)
+            print(image.shape)
+            output_mask = (image > 0.25)
+            output_mask = output_mask * 255
+
+            output_mask = output_mask.squeeze(0).numpy().astype(np.uint8)
+
+            output_mask = reverse_padding(output_mask,
+                                          original_height=int(image_shapes[0][i]),
+                                          original_width=int(image_shapes[1][i]))
+            output_mask = remove_small_objects(output_mask, 10)
             rle_mask = rle_encode(output_mask)
             rles_list.append(rle_mask)
             image_ids_all.append(image_ids[i])
@@ -128,7 +163,8 @@ def main(cfg: dict):
     model = return_model(cfg['model_name'], cfg['in_channels'], cfg['classes'])
     model.load_state_dict(torch.load(cfg["model_path"], map_location=torch.device('cpu')), )
     model.to(device)
-    test_dataset = ImageDataset(test_files, get_valid_transform(cfg['image_size']))
+    model = nn.DataParallel(model)
+    test_dataset = ImageDataset(test_files, get_valid_transform)
     test_loader = DataLoader(test_dataset, batch_size=cfg['batch_size'], shuffle=False, num_workers=cfg['num_workers'],
                              pin_memory=True)
     rles_list, image_ids = inference_fn(model, test_loader, device)
@@ -141,11 +177,11 @@ def main(cfg: dict):
 
 config = {
     "seed": 42,
-    "model_name": "resnet50",
+    "model_name": "tu-seresnext26d_32x4d",
     "in_channels": 3,
     "classes": 1,
     "test_dir": '/kaggle/input/blood-vessel-segmentation/test',
-    "model_path": "/kaggle/input/senet-models/resnet50_baseline_gray_scale/model.pth",
+    "model_path": "/kaggle/input/senet-models/seresnext26d_32x4d_pad_if_needed/model.pth",
     "image_size": 1536,
     "batch_size": 2,
     "num_workers": 2,
