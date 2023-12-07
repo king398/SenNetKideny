@@ -7,7 +7,7 @@ solution_df.loc[solution_df['id'].str.contains('kidney_3_sparse'), 'width'] = 15
 solution_df.loc[solution_df['id'].str.contains('kidney_3_sparse'), 'height'] = 1706
 solution_df.loc[solution_df['id'].str.contains('kidney_3_sparse'), 'group'] = 'kidney_3_sparse'
 solution_df.loc[solution_df['id'].str.contains('kidney_3_sparse'), 'slice'] = np.arange(len(solution_df))
-model_dir = "seresnext26d_32x4d_pad_if_needed_flips"
+model_dir = "seresnext26d_32x4d_pad_unet_plus_plus"
 submission_df = pd.read_csv(f"/home/mithil/PycharmProjects/SenNetKideny/models/{model_dir}/oof.csv")
 score_final = score(
     solution=solution_df,
@@ -22,7 +22,7 @@ import yaml
 
 with open(f"/home/mithil/PycharmProjects/SenNetKideny/models/{model_dir}/config.yaml") as f:
     cfg = yaml.load(f, Loader=yaml.FullLoader)
-cfg['score'] = score_final
+cfg['score'] = float(score_final)
 with open(f"/home/mithil/PycharmProjects/SenNetKideny/models/{model_dir}/config.yaml", 'w') as f:
     yaml.dump(cfg, f, )
 

@@ -36,31 +36,24 @@ def main(cfg):
     train_images = os.listdir(f"{cfg['train_dir']}/images/")
     train_images = list(map(lambda x: f"{cfg['train_dir']}/images/{x}", train_images))
     train_masks = list(map(lambda x: x.replace("images", "labels"), train_images))
-    train_images_2 = os.listdir(f"{cfg['train_dir']}/images/")
-    train_images_2 = list(map(lambda x: f"{cfg['train_dir_2']}/images/{x}", train_images_2))
-    train_masks_2 = list(map(lambda x: x.replace("images", "labels"), train_images_2))
     validation_images = os.listdir(f"{cfg['validation_dir']}/images/")
     validation_images = list(map(lambda x: f"{cfg['validation_dir']}/images/{x}", validation_images))
     validation_masks = list(map(lambda x: x.replace("images", "labels"), validation_images))
-    train_dataset = ImageDataset(train_images, train_masks, get_train_transform_kidney_2(cfg['image_size']))
     train_dataset = ImageDataset(train_images, train_masks, get_train_transform(cfg['image_size']))
     valid_dataset = ImageDataset(validation_images, validation_masks, get_valid_transform(cfg['image_size']))
     train_loader = DataLoader(train_dataset, batch_size=cfg['batch_size'], shuffle=True, num_workers=cfg['num_workers'],
                               pin_memory=True)
-    train_loader_2 = DataLoader(train_dataset, batch_size=cfg['batch_size'], shuffle=True,
-                                num_workers=cfg['num_workers'],
-                                pin_memory=True)
     valid_loader = DataLoader(valid_dataset, batch_size=cfg['batch_size'], shuffle=False,
                               num_workers=cfg['num_workers'], pin_memory=True)
     model = return_model(cfg['model_name'], in_channels=cfg['in_channels'], classes=cfg['classes'])
     optimizer = torch.optim.Adam(model.parameters(), lr=float(cfg['lr']))
     scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=int(len(train_loader) * 5),
                                                                      eta_min=float(cfg['min_lr']))
-    train_loader, valid_loader, model, optimizer, scheduler, train_loader_2 = accelerate.prepare(train_loader,
+    train_loader, valid_loader, model, optimizer, scheduler = accelerate.prepare(train_loader,
                                                                                                  valid_loader,
                                                                                                  model,
                                                                                                  optimizer, scheduler,
-                                                                                                 train_loader_2)
+                                                                                            )
 
     criterion = SoftBCEWithLogitsLoss()
     best_dice = -1
@@ -68,7 +61,6 @@ def main(cfg):
         train_fn(
 
             train_loader=train_loader,
-            train_loader_2=train_loader_2,
             model=model,
             criterion=criterion,
             optimizer=optimizer,

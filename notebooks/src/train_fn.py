@@ -14,7 +14,6 @@ dice = Dice()
 
 def train_fn(
         train_loader: DataLoader,
-        train_loader_2: DataLoader,
         model: Module,
         criterion: Module,
         optimizer: optim.Optimizer,
@@ -29,7 +28,6 @@ def train_fn(
     model.train()
     loss_metric = 0
     stream = tqdm(train_loader, total=len(train_loader), disable=not accelerator.is_local_main_process, )
-    stream_2 = tqdm(train_loader_2, total=len(train_loader_2), disable=not accelerator.is_local_main_process, )
 
     for i, (images, masks) in enumerate(stream):
         masks = masks.float()
@@ -43,22 +41,6 @@ def train_fn(
         loss_metric += loss.item() / (i + 1)
         dice_batch = dice(outputs, masks)
         stream.set_description(
-            f"Epoch:{epoch + 1}, train_loss: {loss_metric:.5f}, dice_batch: {dice_batch.item():.5f}")
-        scheduler.step()
-        accelerator.log({f"train_loss_{fold}": loss_metric, f"train_dice_batch_{fold}": dice_batch.item(),
-                         f"lr_{fold}": optimizer.param_groups[0]['lr']})
-    for i, (images, masks) in enumerate(stream_2):
-        masks = masks.float()
-        images = images.float()
-        output = model(images)
-        loss = criterion(output, masks)
-        accelerator.backward(loss)
-        optimizer.step()
-        optimizer.zero_grad()
-        outputs, masks = accelerator.gather_for_metrics((output, masks))
-        loss_metric += loss.item() / (i + 1)
-        dice_batch = dice(outputs, masks)
-        stream_2.set_description(
             f"Epoch:{epoch + 1}, train_loss: {loss_metric:.5f}, dice_batch: {dice_batch.item():.5f}")
         scheduler.step()
         accelerator.log({f"train_loss_{fold}": loss_metric, f"train_dice_batch_{fold}": dice_batch.item(),
