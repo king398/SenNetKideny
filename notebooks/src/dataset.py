@@ -1,15 +1,16 @@
-import numpy as np
+from utils import *
 from torch.utils.data import Dataset
 import cv2
 from albumentations import Compose
-from typing import Tuple
+from typing import Tuple, List
 import torch
 
 
 class ImageDataset(Dataset):
-    def __init__(self, image_paths: list, mask_paths: list, transform: Compose):
+    def __init__(self, image_paths: List[str], mask_paths: List[str], transform: Compose, kidney_rle: List[str]):
         self.image_paths = image_paths
         self.mask_paths = mask_paths
+        self.kidney_rle = kidney_rle
         self.transform = transform
 
     def __len__(self) -> int:
@@ -23,14 +24,16 @@ class ImageDataset(Dataset):
         mask = cv2.imread(self.mask_paths[item])
         mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
         mask = mask / 255
+        kidney_mask = rle_decode(self.kidney_rle[item], img_shape=mask.shape)
+        mask = np.stack([mask, kidney_mask], axis=2)
         augmented = self.transform(image=image, mask=mask)
         image = augmented["image"]
-        mask = augmented["mask"][None, :, :, ]
+        mask = augmented["mask"]
         return image, mask
 
 
 class ImageDatasetOOF(Dataset):
-    def __init__(self, image_paths: list, transform: Compose):
+    def __init__(self, image_paths: List[str], transform: Compose):
         self.image_paths = image_paths
         self.transform = transform
 

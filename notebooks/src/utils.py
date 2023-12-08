@@ -18,6 +18,16 @@ class Dice(nn.Module):
         dice = self.metric(inputs, targets)
 
         return dice
+class Dice_Valid(nn.Module):
+    def __init__(self, threshold=0.5):
+        super(Dice_Valid, self).__init__()
+        self.metric = Fscore(threshold=threshold, )
+
+    def forward(self, inputs: torch.Tensor, targets: torch.Tensor, smooth: int = 1) -> torch.Tensor:
+        dice = self.metric(inputs, targets)
+
+        return dice
+
 
 
 def seed_everything(seed: int) -> None:
@@ -37,6 +47,7 @@ def write_yaml(config: dict, save_path: str) -> None:
     with open(save_path, 'w') as f:
         yaml.dump(config, f, )
 
+
 def rle_encode(mask):
     pixel = mask.flatten()
     pixel = np.concatenate([[0], pixel, [0]])
@@ -46,6 +57,20 @@ def rle_encode(mask):
     if rle == '':
         rle = '1 0'
     return rle
+
+
+def rle_decode(mask_rle: str, img_shape: tuple = None) -> np.ndarray:
+    seq = mask_rle.split()
+    starts = np.array(list(map(int, seq[0::2])))
+    lengths = np.array(list(map(int, seq[1::2])))
+    assert len(starts) == len(lengths)
+    ends = starts + lengths
+    img = np.zeros((np.product(img_shape),), dtype=np.uint8)
+    for begin, end in zip(starts, ends):
+        img[begin:end] = 1
+    # https://stackoverflow.com/a/46574906/4521646
+    img.shape = img_shape
+    return img
 
 
 def remove_small_objects(mask, min_size):

@@ -8,8 +8,10 @@ from torch import optim
 from accelerate import Accelerator
 from torch.cuda.amp import autocast
 import torch.nn.functional as F
-from augmentations import  reverse_padding
+from augmentations import reverse_padding
+
 dice = Dice()
+dice_valid = Dice_Valid()
 
 
 def train_fn(
@@ -47,7 +49,6 @@ def train_fn(
                          f"lr_{fold}": optimizer.param_groups[0]['lr']})
 
 
-
 def validation_fn(
         valid_loader: DataLoader,
         model: Module,
@@ -70,13 +71,17 @@ def validation_fn(
             loss = criterion(output, masks)
             outputs, masks = accelerator.gather((output, masks))
             loss_metric += loss.item() / (i + 1)
-            dice_batch = dice(outputs, masks)
+            outputs = outputs.sigmoid()
+            outputs = outputs[:, :, 0] * outputs[:, :, 1]
+            dice_batch = dice_valid(outputs, masks[:, :, 0] )
             dice_metric.append(dice_batch.item())
             stream.set_description(
                 f"Epoch:{epoch + 1}, valid_loss: {loss_metric:.5f}, dice_batch: {dice_batch.item():.5f}")
             accelerator.log({f"valid_loss_{fold}": loss_metric, f"valid_dice_batch_{fold}": dice_batch.item()})
     accelerator.print(f"Epoch:{epoch + 1}, valid_loss: {loss_metric:.5f}, dice: {np.mean(dice_metric):.5f}")
-    return np.mean(dice_metric)
+    return loss_metric
+
+
 def oof_fn(model: nn.Module, data_loader: DataLoader, device: torch.device, ):
     torch.cuda.empty_cache()
     model.eval()

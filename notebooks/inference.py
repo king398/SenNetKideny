@@ -1,5 +1,5 @@
 import gc
-
+import ttach as tta
 import numpy as np
 import os
 from torch.utils.data import Dataset, DataLoader
@@ -134,11 +134,33 @@ def inference_fn(model: nn.Module, data_loader: DataLoader, device: torch.device
     image_ids_all = []
     for i, (images, image_shapes, image_ids) in tqdm(enumerate(data_loader), total=len(data_loader)):
         images = images.to(device, non_blocking=True).float()
+        outputs = None
+        counter = 0
         with torch.no_grad() and autocast():
-            outputs = model(images).sigmoid().detach().cpu().float()
+            outputs_batch = model(images).sigmoid().detach().cpu().float()
+            outputs = outputs_batch
+            counter += 1
+            outputs_batch = model(torch.flip(images, dims=[2, ])).sigmoid().detach().cpu().float()
+            outputs += torch.flip(outputs_batch, dims=[2, ])
+            counter += 1
+            outputs_batch = model(torch.flip(images, dims=[3, ])).sigmoid().detach().cpu().float()
+            outputs += torch.flip(outputs_batch, dims=[3, ])
+            counter += 1
+            outputs_batch = model(torch.rot90(images, k=1, dims=[2, 3])).sigmoid().detach().cpu().float()
+            outputs += torch.rot90(outputs_batch, k=-1, dims=[2, 3])
+            counter += 1
+            outputs_batch = model(torch.rot90(images, k=2, dims=[2, 3])).sigmoid().detach().cpu().float()
+            outputs += torch.rot90(outputs_batch, k=-2, dims=[2, 3])
+            counter += 1
+            outputs_batch = model(torch.rot90(images, k=3, dims=[2, 3])).sigmoid().detach().cpu().float()
+            outputs += torch.rot90(outputs_batch, k=-3, dims=[2, 3])
+            counter += 1
+
+        outputs /= counter
+
         for i, image in enumerate(outputs):
             print(image.shape)
-            output_mask = (image > 0.25)
+            output_mask = (image > 0.15)
             output_mask = output_mask * 255
 
             output_mask = output_mask.squeeze(0).numpy().astype(np.uint8)
@@ -162,8 +184,11 @@ def main(cfg: dict):
     test_files = sorted(glob.glob(f"{cfg['test_dir']}/*/images/*.tif"))
     model = return_model(cfg['model_name'], cfg['in_channels'], cfg['classes'])
     model.load_state_dict(torch.load(cfg["model_path"], map_location=torch.device('cpu')), )
-    model.to(device)
     model = nn.DataParallel(model)
+    # model = tta.SegmentationTTAWrapper(model, tta.aliases.flip_transform(), merge_mode='mean')
+
+    model.to(device)
+
     test_dataset = ImageDataset(test_files, get_valid_transform)
     test_loader = DataLoader(test_dataset, batch_size=cfg['batch_size'], shuffle=False, num_workers=cfg['num_workers'],
                              pin_memory=True)
@@ -181,9 +206,9 @@ config = {
     "in_channels": 3,
     "classes": 1,
     "test_dir": '/kaggle/input/blood-vessel-segmentation/test',
-    "model_path": "/kaggle/input/senet-models/seresnext26d_32x4d_pad_if_needed/model.pth",
+    "model_path": "/kaggle/input/senet-models/seresnext26d_32x4d_unet_plus_plus/model.pth",
     "image_size": 1536,
-    "batch_size": 2,
+    "batch_size": 4,
     "num_workers": 2,
 
 }
