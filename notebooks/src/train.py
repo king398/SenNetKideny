@@ -62,7 +62,7 @@ def main(cfg):
                                                                                  )
 
     criterion = SoftBCEWithLogitsLoss()
-    best_valid_loss = np.inf
+    best_dice = -1
     for epoch in range(cfg['epochs']):
         train_fn(
 
@@ -77,7 +77,7 @@ def main(cfg):
 
         )
 
-        valid_loss = validation_fn(
+        dice_score = validation_fn(
             valid_loader=valid_loader,
             model=model,
             criterion=criterion,
@@ -87,8 +87,8 @@ def main(cfg):
 
         )
         accelerate.wait_for_everyone()
-        if valid_loss < best_valid_loss:
-            best_valid_loss = best_valid_loss
+        if dice_score > best_dice:
+            best_dice = best_dice
         unwrapped_model = accelerate.unwrap_model(model)
         model_weights = unwrapped_model.state_dict()
         accelerate.save(model_weights, f"{cfg['model_dir']}/model.pth")

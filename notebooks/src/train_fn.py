@@ -72,14 +72,14 @@ def validation_fn(
             outputs, masks = accelerator.gather((output, masks))
             loss_metric += loss.item() / (i + 1)
             outputs = outputs.sigmoid()
-            outputs = outputs[:, :, 0] * outputs[:, :, 1]
-            dice_batch = dice_valid(outputs, masks[:, :, 0] )
+            outputs = outputs[:, 0, :, :] * outputs[:, 1, :, :]
+            dice_batch = dice_valid(outputs, masks[:, 0, :, :])
             dice_metric.append(dice_batch.item())
             stream.set_description(
                 f"Epoch:{epoch + 1}, valid_loss: {loss_metric:.5f}, dice_batch: {dice_batch.item():.5f}")
             accelerator.log({f"valid_loss_{fold}": loss_metric, f"valid_dice_batch_{fold}": dice_batch.item()})
     accelerator.print(f"Epoch:{epoch + 1}, valid_loss: {loss_metric:.5f}, dice: {np.mean(dice_metric):.5f}")
-    return loss_metric
+    return np.mean(dice_metric)
 
 
 def oof_fn(model: nn.Module, data_loader: DataLoader, device: torch.device, ):
@@ -91,16 +91,19 @@ def oof_fn(model: nn.Module, data_loader: DataLoader, device: torch.device, ):
         images = images.to(device, non_blocking=True).float()
         with torch.no_grad() and autocast():
             outputs = model(images).sigmoid().detach().cpu().float()
+            # outputs = outputs[:, 0, :, :] * outputs[:, 1, :, :]
         for i, image in enumerate(outputs):
-            output_mask = (image > 0.15)
-            output_mask = output_mask * 255
+            kidney = image[1, :, :]
+            kidney = choose_biggest_object(kidney.numpy(), 0.5)
+            output_mask = (image[0, :, :] > 0.15).numpy()
+            output_mask = ((output_mask * kidney) * 255).astype(np.uint8)
 
-            output_mask = output_mask.squeeze(0).numpy().astype(np.uint8)
+            #output_mask = output_mask.squeeze(0).numpy().astype(np.uint8)
 
             output_mask = reverse_padding(output_mask,
                                           original_height=int(image_shapes[0][i]),
                                           original_width=int(image_shapes[1][i]))
-            output_mask = remove_small_objects(output_mask, 10)
+            # output_mask = remove_small_objects(output_mask, 10)
             rle_mask = rle_encode(output_mask)
 
             rles_list.append(rle_mask)

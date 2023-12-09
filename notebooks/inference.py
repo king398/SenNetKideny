@@ -32,6 +32,17 @@ def remove_small_objects(mask, min_size):
 
     return processed
 
+def choose_biggest_object(mask, threshold):
+    mask = ((mask > threshold) * 255).astype(np.uint8)
+    num_label, label, stats, centroid = cv2.connectedComponentsWithStats(mask, connectivity=8)
+    max_label = -1
+    max_area = -1
+    for l in range(1, num_label):
+        if stats[l, cv2.CC_STAT_AREA] >= max_area:
+            max_area = stats[l, cv2.CC_STAT_AREA]
+            max_label = l
+    processed = (label == max_label).astype(np.uint8)
+    return processed
 
 def rle_encode(mask):
     pixel = mask.flatten()
@@ -159,16 +170,15 @@ def inference_fn(model: nn.Module, data_loader: DataLoader, device: torch.device
         outputs /= counter
 
         for i, image in enumerate(outputs):
-            print(image.shape)
-            output_mask = (image > 0.15)
-            output_mask = output_mask * 255
-
-            output_mask = output_mask.squeeze(0).numpy().astype(np.uint8)
+            kidney = image[1, :, :]
+            kidney = choose_biggest_object(kidney.numpy(), 0.5)
+            output_mask = (image[0, :, :] > 0.15).numpy()
+            output_mask = ((output_mask * kidney) * 255).astype(np.uint8)
 
             output_mask = reverse_padding(output_mask,
                                           original_height=int(image_shapes[0][i]),
                                           original_width=int(image_shapes[1][i]))
-            output_mask = remove_small_objects(output_mask, 10)
+            #output_mask = remove_small_objects(output_mask, 10)
             rle_mask = rle_encode(output_mask)
             rles_list.append(rle_mask)
             image_ids_all.append(image_ids[i])
@@ -204,9 +214,9 @@ config = {
     "seed": 42,
     "model_name": "tu-seresnext26d_32x4d",
     "in_channels": 3,
-    "classes": 1,
+    "classes": 2,
     "test_dir": '/kaggle/input/blood-vessel-segmentation/test',
-    "model_path": "/kaggle/input/senet-models/seresnext26d_32x4d_unet_plus_plus/model.pth",
+    "model_path": "/kaggle/input/senet-models/seresnext26d_32x4d_pad_kidney/model.pth",
     "image_size": 1536,
     "batch_size": 4,
     "num_workers": 2,

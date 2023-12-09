@@ -18,6 +18,8 @@ class Dice(nn.Module):
         dice = self.metric(inputs, targets)
 
         return dice
+
+
 class Dice_Valid(nn.Module):
     def __init__(self, threshold=0.5):
         super(Dice_Valid, self).__init__()
@@ -27,7 +29,6 @@ class Dice_Valid(nn.Module):
         dice = self.metric(inputs, targets)
 
         return dice
-
 
 
 def seed_everything(seed: int) -> None:
@@ -83,4 +84,17 @@ def remove_small_objects(mask, min_size):
         if stats[l, cv2.CC_STAT_AREA] >= min_size:
             processed[label == l] = 255
 
+    return processed
+
+
+def choose_biggest_object(mask, threshold):
+    mask = ((mask > threshold) * 255).astype(np.uint8)
+    num_label, label, stats, centroid = cv2.connectedComponentsWithStats(mask, connectivity=8)
+    max_label = -1
+    max_area = -1
+    for l in range(1, num_label):
+        if stats[l, cv2.CC_STAT_AREA] >= max_area:
+            max_area = stats[l, cv2.CC_STAT_AREA]
+            max_label = l
+    processed = (label == max_label).astype(np.uint8)
     return processed
