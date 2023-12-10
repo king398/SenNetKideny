@@ -6,10 +6,10 @@ image_size: 1536
 batch_size: 4
 num_workers: 8
 lr: 0.0003
-model_name: tu-tf_efficientnet_b3.ns_jft_in1k
+model_name: tu-seresnext101d_32x8d
 in_channels: 3
 classes: 2
 min_lr: 3e-06
 epochs: 15
-model_dir: /home/mithil/PycharmProjects/SenNetKideny/models/tf_efficientnet_b3_pad_kidney
+model_dir: /home/mithil/PycharmProjects/SenNetKideny/models/seresnext101d_32x8d_pad_kidney
 kidneys_df: /home/mithil/PycharmProjects/SenNetKideny/data/train_rles_kidneys.csv

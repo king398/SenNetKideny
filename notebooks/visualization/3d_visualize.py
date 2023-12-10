@@ -3,10 +3,11 @@ import numpy as np
 import pyvista as pv
 import os
 from tqdm import tqdm
+
 # Load data
 data_dir = '/home/mithil/PycharmProjects/SenNetKideny/data'
 files = [f'{data_dir}/train/kidney_1_dense/labels/{i:04d}.tif' for i in
-         range(len(os.listdir(f'{data_dir}/train/kidney_1_dense/labels/')[:1500]))]
+         range(len(os.listdir(f'{data_dir}/train/kidney_1_dense/labels/')))]
 mask = [cv2.imread(f, cv2.IMREAD_GRAYSCALE) for f in files]
 mask = np.stack(mask) / 255
 
@@ -14,9 +15,9 @@ mask = np.stack(mask) / 255
 point1 = np.stack(np.where(mask > 0.1)).T
 centroid = np.mean(point1, axis=0)
 
-pd1 = pv.PolyData(point1,)
+pd1 = pv.PolyData(point1, )
 mesh1 = pd1.glyph(geom=pv.Cube())
-
+mesh1.save("kidney_2.vtk")
 # Set up the plotter and open a movie file
 filename = "kidney_visualization.mp4"
 plotter = pv.Plotter(window_size=[3840, 2160])
@@ -31,17 +32,16 @@ plotter.add_mesh(mesh1, color='purple')
 plotter.write_frame()
 
 # Animation parameters
-frame_count = 1080
+frame_count = 1920
 distances = np.linalg.norm(point1 - centroid, axis=1)
-radius = np.max(distances)   # 1.5 is a scaling factor for better visibility
-
+radius = np.max(distances)  # 1.5 is a scaling factor for better visibility
 
 # Update the camera position and write each frame
 for i in tqdm(range(frame_count)):
     angle = i * (360 / frame_count)
     x = radius * np.cos(np.radians(angle))
     y = radius * np.sin(np.radians(angle))
-    camera_position = [x, y, 200]  # Adjust the Z value as needed
+    camera_position = [x, y, 180]  # Adjust the Z value as needed
     focal_point = centroid.tolist()  # Convert centroid to a list if it's a numpy array
     view_up = [0, 0, 1]  # Z-axis is up
 
