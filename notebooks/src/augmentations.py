@@ -2,25 +2,16 @@ from albumentations import *
 from albumentations.pytorch import ToTensorV2
 
 
-def get_train_transform(DIM) -> Compose:
+def get_train_transform(height: int = 1312, width: int = 928) -> Compose:
     return Compose([
-        PadIfNeeded(min_height=1312, min_width=928),
+        PadIfNeeded(min_height=height, min_width=width),
         # HorizontalFlip(p=0.5),
         # VerticalFlip(p=0.5),
         # RandomRotate90(p=0.5),
         ToTensorV2(transpose_mask=True), ])
 
 
-def get_train_transform_kidney_2(DIM) -> Compose:
-    return Compose([
-        PadIfNeeded(min_height=1056, min_width=1536),
-        # HorizontalFlip(p=0.5),
-        # VerticalFlip(p=0.5),
-        # RandomRotate90(p=0.5),
-        ToTensorV2(transpose_mask=True), ])
-
-
-def reverse_padding(image, original_height, original_width):
+def reverse_padding(image: int, original_height: int, original_width: int):
     """
     Crops the padded image back to its original dimensions.
 
@@ -36,8 +27,8 @@ def reverse_padding(image, original_height, original_width):
     return transform(image=image)['image']
 
 
-def get_valid_transform(DIM) -> Compose:
+def get_valid_transform(height: int = 1728, width: int = 1536) -> Compose:
     return Compose([
-        PadIfNeeded(min_height=1728, min_width=1536),
+        PadIfNeeded(min_height=height, min_width=width),
         ToTensorV2(transpose_mask=True),
     ])

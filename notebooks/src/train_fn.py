@@ -14,8 +14,14 @@ dice = Dice()
 dice_valid = Dice_Valid()
 
 
+def get_color_escape(r, g, b, background=False):
+    return f'\033[{"48" if background else "38"};2;{r};{g};{b}m'
+
+
 def train_fn(
         train_loader: DataLoader,
+        train_loader_xz: DataLoader,
+        train_loader_yz: DataLoader,
         model: Module,
         criterion: Module,
         optimizer: optim.Optimizer,
@@ -29,8 +35,15 @@ def train_fn(
     torch.cuda.empty_cache()
     model.train()
     loss_metric = 0
-    stream = tqdm(train_loader, total=len(train_loader), disable=not accelerator.is_local_main_process, )
+    tqdm_color = get_color_escape(255, 0, 0)  # Red color for example
+    tqdm_style = {
+        'bar_format': f'{tqdm_color}{{l_bar}}{{bar}}| {{n_fmt}}/{{total_fmt}} [{{elapsed}}<{{remaining}}, {{rate_fmt}}{{postfix}}]{get_color_escape(255, 255, 255)}'}
 
+    stream = tqdm(train_loader, total=len(train_loader), disable=not accelerator.is_local_main_process, **tqdm_style)
+    stream_xz = tqdm(train_loader_xz, total=len(train_loader_xz), disable=not accelerator.is_local_main_process,
+                     **tqdm_style)
+    stream_yz = tqdm(train_loader_yz, total=len(train_loader_yz), disable=not accelerator.is_local_main_process,
+                     **tqdm_style)
     for i, (images, masks) in enumerate(stream):
         masks = masks.float()
         images = images.float()
@@ -43,6 +56,39 @@ def train_fn(
         loss_metric += loss.item() / (i + 1)
         dice_batch = dice(outputs, masks)
         stream.set_description(
+            f"Epoch:{epoch + 1}, train_loss: {loss_metric:.5f}, dice_batch: {dice_batch.item():.5f}")
+        scheduler.step()
+        accelerator.log({f"train_loss_{fold}": loss_metric, f"train_dice_batch_{fold}": dice_batch.item(),
+                         f"lr_{fold}": optimizer.param_groups[0]['lr']})
+    for i, (images, masks) in enumerate(stream_xz):
+        masks = masks.float()
+        images = images.float()
+        output = model(images)
+        loss = criterion(output, masks)
+        accelerator.backward(loss)
+        optimizer.step()
+        optimizer.zero_grad()
+        outputs, masks = accelerator.gather_for_metrics((output, masks))
+        loss_metric += loss.item() / (i + 1)
+        dice_batch = dice(outputs, masks)
+        stream_xz.set_description(
+            f"Epoch:{epoch + 1}, train_loss: {loss_metric:.5f}, dice_batch: {dice_batch.item():.5f}")
+        scheduler.step()
+        accelerator.log({f"train_loss_{fold}": loss_metric, f"train_dice_batch_{fold}": dice_batch.item(),
+                         f"lr_{fold}": optimizer.param_groups[0]['lr']})
+    torch.cuda.empty_cache()
+    for i, (images, masks) in enumerate(stream_yz):
+        masks = masks.float()
+        images = images.float()
+        output = model(images)
+        loss = criterion(output, masks)
+        accelerator.backward(loss)
+        optimizer.step()
+        optimizer.zero_grad()
+        outputs, masks = accelerator.gather_for_metrics((output, masks))
+        loss_metric += loss.item() / (i + 1)
+        dice_batch = dice(outputs, masks)
+        stream_yz.set_description(
             f"Epoch:{epoch + 1}, train_loss: {loss_metric:.5f}, dice_batch: {dice_batch.item():.5f}")
         scheduler.step()
         accelerator.log({f"train_loss_{fold}": loss_metric, f"train_dice_batch_{fold}": dice_batch.item(),
@@ -98,7 +144,7 @@ def oof_fn(model: nn.Module, data_loader: DataLoader, device: torch.device, ):
             output_mask = (image[0, :, :] > 0.15).numpy()
             output_mask = ((output_mask * kidney) * 255).astype(np.uint8)
 
-            #output_mask = output_mask.squeeze(0).numpy().astype(np.uint8)
+            # output_mask = output_mask.squeeze(0).numpy().astype(np.uint8)
 
             output_mask = reverse_padding(output_mask,
                                           original_height=int(image_shapes[0][i]),

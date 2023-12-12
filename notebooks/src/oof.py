@@ -1,5 +1,4 @@
 from utils import *
-from torch.nn import Module
 import glob
 from model import *
 from augmentations import get_valid_transform
@@ -20,7 +19,7 @@ def main(cfg: dict):
     model.load_state_dict(torch.load(f"{cfg['model_dir']}/model.pth", map_location=torch.device('cpu')))
     model.to(device)
     model.eval()
-    test_dataset = ImageDatasetOOF(validation_dir, get_valid_transform(cfg['image_size']))
+    test_dataset = ImageDatasetOOF(validation_dir, get_valid_transform())
     test_loader = DataLoader(test_dataset, batch_size=int(cfg['batch_size'] / 2), shuffle=False,
                              num_workers=cfg['num_workers'], pin_memory=True)
     rles_list, image_ids = oof_fn(model, test_loader, device)
