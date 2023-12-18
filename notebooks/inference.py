@@ -17,6 +17,7 @@ import glob
 from torch import nn
 import pandas as pd
 from albumentations import CenterCrop
+from typing import Literal
 
 
 # https://www.kaggle.com/competitions/blood-vessel-segmentation/discussion/456033
@@ -32,6 +33,7 @@ def remove_small_objects(mask, min_size):
 
     return processed
 
+
 def choose_biggest_object(mask, threshold):
     mask = ((mask > threshold) * 255).astype(np.uint8)
     num_label, label, stats, centroid = cv2.connectedComponentsWithStats(mask, connectivity=8)
@@ -43,6 +45,7 @@ def choose_biggest_object(mask, threshold):
             max_label = l
     processed = (label == max_label).astype(np.uint8)
     return processed
+
 
 def rle_encode(mask):
     pixel = mask.flatten()
@@ -90,15 +93,26 @@ def seed_everything(seed: int) -> None:
 
 
 class ImageDataset(Dataset):
-    def __init__(self, image_paths: list, transform):
+    def __init__(self, image_paths: list, transform, volume: np.array, mode: Literal["xy", "yz", "xz"] = "xy", ):
         self.image_paths = image_paths
         self.transform = transform
+        self.mode = mode
+        self.volume = volume
 
     def __len__(self) -> int:
         return len(self.image_paths)
 
     def __getitem__(self, item) -> tuple[torch.Tensor, tuple[str, ...], str]:
-        image = cv2.imread(self.image_paths[item])
+        match self.mode:
+            case "xy":
+                image = self.volume[item]
+            case "xz":
+                image = self.volume[:, item]
+            case "yz":
+                image = self.volume[:, :, item]
+            case _:
+                raise ValueError("Invalid mode")
+
         image_id = self.image_paths[item].split("/")[-1].split(".")[0]
         folder_id = self.image_paths[item].split("/")[-3]
         image_id = f"{folder_id}_{image_id}"
@@ -178,7 +192,7 @@ def inference_fn(model: nn.Module, data_loader: DataLoader, device: torch.device
             output_mask = reverse_padding(output_mask,
                                           original_height=int(image_shapes[0][i]),
                                           original_width=int(image_shapes[1][i]))
-            #output_mask = remove_small_objects(output_mask, 10)
+            # output_mask = remove_small_objects(output_mask, 10)
             rle_mask = rle_encode(output_mask)
             rles_list.append(rle_mask)
             image_ids_all.append(image_ids[i])
@@ -191,18 +205,29 @@ def inference_fn(model: nn.Module, data_loader: DataLoader, device: torch.device
 def main(cfg: dict):
     seed_everything(cfg['seed'])
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    test_files = sorted(glob.glob(f"{cfg['test_dir']}/*/images/*.tif"))
+    # test_files = sorted(glob.glob(f"{cfg['test_dir']}/*/images/*.tif"))
+    test_dirs = sorted(glob.glob(f"{cfg['test_dir']}/*"))
     model = return_model(cfg['model_name'], cfg['in_channels'], cfg['classes'])
     model.load_state_dict(torch.load(cfg["model_path"], map_location=torch.device('cpu')), )
     model = nn.DataParallel(model)
+    global_rle_list = []
+
     # model = tta.SegmentationTTAWrapper(model, tta.aliases.flip_transform(), merge_mode='mean')
 
     model.to(device)
 
-    test_dataset = ImageDataset(test_files, get_valid_transform)
-    test_loader = DataLoader(test_dataset, batch_size=cfg['batch_size'], shuffle=False, num_workers=cfg['num_workers'],
-                             pin_memory=True)
-    rles_list, image_ids = inference_fn(model, test_loader, device)
+    for test_dir in test_dirs:
+        test_files = sorted(glob.glob(f"{test_dir}/images/*.tif"))
+        volume = np.stack([cv2.imread(i) for i in test_files])
+        test_dataset_xy = ImageDataset(test_files, get_valid_transform, mode='xy', volume=volume)
+        test_dataset_xz = ImageDataset(test_files, get_valid_transform, mode='xz',
+                                       volume=volume)
+        test_dataset_yz = ImageDataset(test_files, get_valid_transform, mode='yz',
+                                       volume=volume)
+        test_loader = DataLoader(test_dataset_xy, batch_size=cfg['batch_size'], shuffle=False,
+                                 num_workers=cfg['num_workers'], pin_memory=True)
+        rles_list, image_ids = inference_fn(model=model, data_loader=test_loader, device=device)
+        global_rle_list += rles_list
     submission = pd.DataFrame()
     submission['id'] = image_ids
     submission['rle'] = rles_list

@@ -28,7 +28,7 @@ plotter.open_movie(filename)
 
 # Add the mesh
 plotter.add_mesh(mesh1, color='purple')
-
+plotter.show()
 # Start the plotter
 
 # Write the initial frame

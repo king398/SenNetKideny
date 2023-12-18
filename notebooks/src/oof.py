@@ -18,7 +18,7 @@ def main(cfg: dict):
     validation_dir = sorted(glob.glob(f"{cfg['validation_dir']}/images/*.tif"))
     validation_dir_xz = sorted(glob.glob(f"{cfg['validation_dir']}_xz/images/*.tif"))
     validation_dir_yz = sorted(glob.glob(f"{cfg['validation_dir']}_yz/images/*.tif"))
-    validation_images_stacked = np.stack([cv2.imread(i, cv2.IMREAD_GRAYSCALE) for i in validation_dir])
+    validation_images_stacked = np.stack([cv2.imread(i) for i in validation_dir])
 
     model = return_model(cfg['model_name'], cfg['in_channels'], cfg['classes'])
     model.load_state_dict(torch.load(f"{cfg['model_dir']}/model.pth", map_location=torch.device('cpu')))
@@ -28,16 +28,16 @@ def main(cfg: dict):
     test_dataset_xz = ImageDatasetOOF(validation_dir_xz, get_valid_transform(height=1056, width=1536), mode='xz',
                                       volume=validation_images_stacked)
     test_dataset_yz = ImageDatasetOOF(validation_dir_yz, get_valid_transform(height=1056, width=1728),
-                                      volume=validation_images_stacked,mode='yz')
-    test_loader = DataLoader(test_dataset, batch_size=int(cfg['batch_size'] ), shuffle=False,
+                                      volume=validation_images_stacked, mode='yz')
+    test_loader = DataLoader(test_dataset, batch_size=int(cfg['batch_size']), shuffle=False,
                              num_workers=cfg['num_workers'], pin_memory=True)
-    test_loader_xz = DataLoader(test_dataset_xz, batch_size=int(cfg['batch_size'] ), shuffle=False,
+    test_loader_xz = DataLoader(test_dataset_xz, batch_size=int(cfg['batch_size']), shuffle=False,
                                 num_workers=cfg['num_workers'], pin_memory=True)
-    test_loader_yz = DataLoader(test_dataset_yz, batch_size=int(cfg['batch_size'] ), shuffle=False,
+    test_loader_yz = DataLoader(test_dataset_yz, batch_size=int(cfg['batch_size']), shuffle=False,
                                 num_workers=cfg['num_workers'], pin_memory=True)
 
     rles_list, image_ids, volume = oof_fn(model=model, data_loader=test_loader, device=device,
-                                          volume_shape=validation_images_stacked.shape,
+                                          volume_shape=validation_images_stacked.shape[:3],
                                           data_loader_xz=test_loader_xz, data_loader_yz=test_loader_yz)
     oof = pd.DataFrame()
     oof['id'] = image_ids

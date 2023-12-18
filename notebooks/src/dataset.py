@@ -61,14 +61,9 @@ class ImageDatasetOOF(Dataset):
             image = self.volume[item]
         elif self.mode == "xz":
 
-            # Calculate padding sizes
-
             image = self.volume[:, item]
         elif self.mode == "yz":
             image = self.volume[:, :, item]
-            print(image.shape)
-
-
         else:
             raise ValueError("mode must be either xz or yz")
 

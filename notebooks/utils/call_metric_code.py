@@ -1,4 +1,4 @@
-from notebooks.src.metric import score
+from notebooks.src.metric import compute_surface_dice_score
 import pandas as pd
 import numpy as np
 
@@ -14,15 +14,8 @@ submission_df = pd.read_csv(f"/home/mithil/PycharmProjects/SenNetKideny/models/{
 # replace sparse with dense
 submission_df['id'] = submission_df['id'].apply(lambda x: x.replace('sparse', 'dense'))
 # only keep the id with are present in solution
-submission_df = submission_df[submission_df['id'].isin(solution_df['id'].values)]
-score_final = score(
-    solution=solution_df,
-    submission=submission_df,
-    row_id_column_name='id',
-    rle_column_name='rle',
-    tolerance=0,
-    image_id_column_name='group',
-    slice_id_column_name='slice',
+submission_df = submission_df[submission_df['id'].isin(solution_df['id'].values)].reset_index(drop=True)
+score_final = compute_surface_dice_score(submit=submission_df,label=solution_df,
 )
 import yaml
 

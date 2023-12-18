@@ -145,7 +145,6 @@ def oof_fn(model: nn.Module, data_loader: DataLoader, data_loader_xz: DataLoader
     j = 0
     for i, (images, image_shapes, image_ids) in tqdm(enumerate(data_loader), total=len(data_loader)):
 
-
         # tranpose the image
         images = images.to(device, non_blocking=True).float()
         with torch.no_grad() and autocast():
@@ -173,7 +172,6 @@ def oof_fn(model: nn.Module, data_loader: DataLoader, data_loader_xz: DataLoader
         del outputs, images, output_mask
     j = 0
     for i, (images, image_shapes, image_ids) in tqdm(enumerate(data_loader_xz), total=len(data_loader_xz)):
-
 
         images = images.to(device, non_blocking=True).float()
         with torch.no_grad() and autocast():
@@ -214,9 +212,11 @@ def oof_fn(model: nn.Module, data_loader: DataLoader, data_loader_xz: DataLoader
             volume[:, :, j] += output_mask
             j += 1
         gc.collect()
+
     volume = volume / 3
     print(volume.max())
-    volume = ((volume > 0.05) * 255).astype(np.uint8)
+
+    volume = ((volume > 0.15) * 255).astype(np.uint8)
     print(volume.max())
     for output_mask in volume:
         rle_mask = rle_encode(output_mask)
