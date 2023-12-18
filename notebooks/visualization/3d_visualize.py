@@ -3,17 +3,20 @@ import numpy as np
 import pyvista as pv
 import os
 from tqdm import tqdm
+from notebooks.src.utils import rle_decode
+import pandas as pd
 
 # Load data
 data_dir = '/home/mithil/PycharmProjects/SenNetKideny/data'
 files = [f'{data_dir}/train/kidney_1_dense/labels/{i:04d}.tif' for i in
          range(len(os.listdir(f'{data_dir}/train/kidney_1_dense/labels/')))]
-mask = [cv2.imread(f, cv2.IMREAD_GRAYSCALE) for f in files]
-mask = np.stack(mask) / 255
+
+model_dir = "seresnext101d_32x8d_pad_kidney_multiview"
+mask = np.load(f"/home/mithil/PycharmProjects/SenNetKideny/models/seresnext101d_32x8d_pad_kidney_multiview/volume.npz")['volume']
 
 # Create 3D visualization
 point1 = np.stack(np.where(mask > 0.1)).T
-centroid = np.mean(point1, axis=0)
+centroid = np.mean(mask, axis=0)
 
 pd1 = pv.PolyData(point1, )
 mesh1 = pd1.glyph(geom=pv.Cube())
