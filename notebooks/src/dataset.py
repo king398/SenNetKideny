@@ -2,7 +2,7 @@ from utils import *
 from torch.utils.data import Dataset
 import cv2
 from albumentations import Compose
-from typing import Tuple, List
+from typing import Tuple, List, Literal
 import torch
 
 
@@ -46,7 +46,8 @@ class ImageDataset(Dataset):
 
 
 class ImageDatasetOOF(Dataset):
-    def __init__(self, image_paths: List[str], transform: Compose, volume, mode="xy",transform2=None):
+    def __init__(self, image_paths: List[str], transform: Compose, volume: np.array,
+                 mode: Literal["xy", "yz", "xz"] = "xy"):
         self.image_paths = image_paths
         self.transform = transform
         self.volume = volume
@@ -63,6 +64,10 @@ class ImageDatasetOOF(Dataset):
             # Calculate padding sizes
 
             image = self.volume[:, item]
+        elif self.mode == "yz":
+            image = self.volume[:, :, item]
+            print(image.shape)
+
 
         else:
             raise ValueError("mode must be either xz or yz")

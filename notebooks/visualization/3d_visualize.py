@@ -32,7 +32,8 @@ plotter.add_mesh(mesh1, color='purple')
 # Start the plotter
 
 # Write the initial frame
-plotter.write_frame()
+
+"""plotter.write_frame()
 
 # Animation parameters
 frame_count = 1920
@@ -55,3 +56,4 @@ for i in tqdm(range(frame_count)):
 
 # Close the plotter to finish the movie
 plotter.close()
+"""

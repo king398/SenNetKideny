@@ -28,12 +28,12 @@ def main(cfg: dict):
     test_dataset_xz = ImageDatasetOOF(validation_dir_xz, get_valid_transform(height=1056, width=1536), mode='xz',
                                       volume=validation_images_stacked)
     test_dataset_yz = ImageDatasetOOF(validation_dir_yz, get_valid_transform(height=1056, width=1728),
-                                      volume=validation_images_stacked)
-    test_loader = DataLoader(test_dataset, batch_size=int(cfg['batch_size'] / 2), shuffle=False,
+                                      volume=validation_images_stacked,mode='yz')
+    test_loader = DataLoader(test_dataset, batch_size=int(cfg['batch_size'] ), shuffle=False,
                              num_workers=cfg['num_workers'], pin_memory=True)
-    test_loader_xz = DataLoader(test_dataset_xz, batch_size=int(cfg['batch_size'] / 2), shuffle=False,
+    test_loader_xz = DataLoader(test_dataset_xz, batch_size=int(cfg['batch_size'] ), shuffle=False,
                                 num_workers=cfg['num_workers'], pin_memory=True)
-    test_loader_yz = DataLoader(test_dataset_yz, batch_size=int(cfg['batch_size'] / 2), shuffle=False,
+    test_loader_yz = DataLoader(test_dataset_yz, batch_size=int(cfg['batch_size'] ), shuffle=False,
                                 num_workers=cfg['num_workers'], pin_memory=True)
 
     rles_list, image_ids, volume = oof_fn(model=model, data_loader=test_loader, device=device,
