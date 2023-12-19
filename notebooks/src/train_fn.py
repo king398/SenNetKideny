@@ -113,6 +113,7 @@ def validation_fn(
     stream = tqdm(valid_loader, total=len(valid_loader), disable=not accelerator.is_local_main_process, **tqdm_style)
     loss_metric = 0
     dice_metric = []
+    pd_dataframe = {"id": [], "rle": []}
     with torch.no_grad():
         for i, (images, masks) in enumerate(stream):
             masks = masks.float()
@@ -155,17 +156,12 @@ def oof_fn(model: nn.Module, data_loader: DataLoader, data_loader_xz: DataLoader
             kidney = image[1, :, :]
             kidney = choose_biggest_object(kidney.numpy(), 0.5)
             output_mask = image[0, :, :]
-            # output_mask = (image[0, :, :] > 0.15).numpy()
             output_mask = (output_mask.numpy() * kidney)
-
-            # output_mask = output_mask.squeeze(0).numpy().astype(np.uint8)
 
             output_mask = reverse_padding(output_mask,
                                           original_height=int(image_shapes[0][p]),
                                           original_width=int(image_shapes[1][p]))
             volume[j] += output_mask
-            # output_mask = remove_small_objects(output_mask, 10)
-            # output_mask = (output_mask > 0.15).astype(np.uint8)
 
             image_ids_all.append(image_ids[p])
             j += 1
@@ -186,10 +182,8 @@ def oof_fn(model: nn.Module, data_loader: DataLoader, data_loader_xz: DataLoader
                                           original_height=int(image_shapes[0][p]),
                                           original_width=int(image_shapes[1
                                                              ][p]))
-            # swap axes
-            # flip
 
-            volume[:, j] += output_mask[1]
+            volume[:, j] += output_mask
             j += 1
     j = 0
     for i, (images, image_shapes, image_ids) in tqdm(enumerate(data_loader_yz), total=len(data_loader_yz)):
@@ -203,20 +197,17 @@ def oof_fn(model: nn.Module, data_loader: DataLoader, data_loader_xz: DataLoader
             kidney = image[1, :, :]
             kidney = choose_biggest_object(kidney.numpy(), 0.5)
             output_mask = image[0, :, :] * kidney
-            output_mask = ((output_mask.numpy() * kidney))
+            output_mask = (output_mask.numpy() * kidney)
             output_mask = reverse_padding(output_mask,
                                           original_height=int(image_shapes[0][p]),
                                           original_width=int(image_shapes[1][p]))
-            # output_mask = np.transpose(output_mask, (1, 0))
 
             volume[:, :, j] += output_mask
             j += 1
         gc.collect()
 
     volume = volume / 3
-    print(volume.max())
-
-    volume = ((volume > 0.15) * 255).astype(np.uint8)
+    volume = ((volume > 0.2) * 255).astype(np.uint8)
     print(volume.max())
     for output_mask in volume:
         rle_mask = rle_encode(output_mask)

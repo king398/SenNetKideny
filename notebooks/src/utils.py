@@ -49,7 +49,7 @@ def write_yaml(config: dict, save_path: str) -> None:
         yaml.dump(config, f, )
 
 
-def rle_encode(mask):
+def rle_encode(mask: np.array):
     pixel = mask.flatten()
     pixel = np.concatenate([[0], pixel, [0]])
     run = np.where(pixel[1:] != pixel[:-1])[0] + 1
@@ -58,6 +58,24 @@ def rle_encode(mask):
     if rle == '':
         rle = '1 0'
     return rle
+
+
+def apply_canny_threshold_in_chunk(x: np.array, low: float, high: float, chunk_size: int = 32):
+    D, H, W = x.shape
+    predict = np.zeros((D, H, W), np.uint8)
+    # Modify the iteration to step fully by chunk_size without overlapping
+    for i in range(0, D, chunk_size):
+        # Determine the end index of the chunk, considering the end of the array
+        end_i = i + chunk_size if i + chunk_size < D else D
+        # Extract the chunk of images to process with Canny
+        chunk = x[i:end_i]
+        # Apply Canny edge detection on each 2D slice in the chunk
+        chunk_edges = np.zeros_like(chunk)
+        for j in range(chunk.shape[0]):
+            chunk_edges[j] = cv2.Canny(chunk[j].astype(np.uint8), low, high)
+        # Place the processed chunk back into the predict array
+        predict[i:end_i] = chunk_edges
+    return predict
 
 
 def rle_decode(mask_rle: str, img_shape: tuple = None) -> np.ndarray:

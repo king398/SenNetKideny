@@ -18,7 +18,7 @@ def main(cfg: dict):
     validation_dir = sorted(glob.glob(f"{cfg['validation_dir']}/images/*.tif"))
     validation_dir_xz = sorted(glob.glob(f"{cfg['validation_dir']}_xz/images/*.tif"))
     validation_dir_yz = sorted(glob.glob(f"{cfg['validation_dir']}_yz/images/*.tif"))
-    validation_images_stacked = np.stack([cv2.imread(i) for i in validation_dir])
+    validation_images_stacked = np.stack([cv2.imread(i) for i in validation_dir], )
 
     model = return_model(cfg['model_name'], cfg['in_channels'], cfg['classes'])
     model.load_state_dict(torch.load(f"{cfg['model_dir']}/model.pth", map_location=torch.device('cpu')))
