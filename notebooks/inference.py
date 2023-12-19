@@ -1,4 +1,6 @@
 import gc
+
+import albumentations
 import numpy as np
 import os
 from torch.utils.data import Dataset, DataLoader
@@ -18,21 +20,7 @@ from albumentations import CenterCrop
 from typing import Literal
 
 
-# https://www.kaggle.com/competitions/blood-vessel-segmentation/discussion/456033
-def remove_small_objects(mask, min_size):
-    # Find all connected components (labels)
-    num_label, label, stats, centroid = cv2.connectedComponentsWithStats(mask, connectivity=8)
-
-    # create a mask where small objects are removed
-    processed = np.zeros_like(mask)
-    for l in range(1, num_label):
-        if stats[l, cv2.CC_STAT_AREA] >= min_size:
-            processed[label == l] = 255
-
-    return processed
-
-
-def choose_biggest_object(mask, threshold):
+def choose_biggest_object(mask: np.array, threshold: float) -> np.array:
     mask = ((mask > threshold) * 255).astype(np.uint8)
     num_label, label, stats, centroid = cv2.connectedComponentsWithStats(mask, connectivity=8)
     max_label = -1
@@ -45,7 +33,7 @@ def choose_biggest_object(mask, threshold):
     return processed
 
 
-def rle_encode(mask):
+def rle_encode(mask: np.array) -> str:
     pixel = mask.flatten()
     pixel = np.concatenate([[0], pixel, [0]])
     run = np.where(pixel[1:] != pixel[:-1])[0] + 1
@@ -56,7 +44,7 @@ def rle_encode(mask):
     return rle
 
 
-def get_valid_transform(image, original_height, original_width):
+def get_valid_transform(image: np.array, original_height: int, original_width: int) -> np.array:
     """
     Crops the padded image back to its original dimensions.
 
@@ -91,7 +79,8 @@ def seed_everything(seed: int) -> None:
 
 
 class ImageDataset(Dataset):
-    def __init__(self, image_paths: list, transform, volume: np.array, mode: Literal["xy", "yz", "xz"] = "xy", ):
+    def __init__(self, image_paths: list, transform, volume: np.array,
+                 mode: Literal["xy", "yz", "xz"] = "xy", ):
         self.image_paths = image_paths
         self.transform = transform
         self.mode = mode
@@ -100,7 +89,7 @@ class ImageDataset(Dataset):
     def __len__(self) -> int:
         return len(self.image_paths)
 
-    def __getitem__(self, item) -> tuple[torch.Tensor, tuple[str, ...], str]:
+    def __getitem__(self, item) -> tuple[torch.Tensor, Tuple, str]:
         match self.mode:
             case "xy":
                 image = self.volume[item]
@@ -123,7 +112,7 @@ class ImageDataset(Dataset):
         return image, image_shape, image_id
 
 
-def return_model(model_name: str, in_channels: int, classes: int):
+def return_model(model_name: str, in_channels: int, classes: int) -> nn.Module:
     model = smp.Unet(
         encoder_name=model_name,
         encoder_weights=None,
@@ -134,7 +123,7 @@ def return_model(model_name: str, in_channels: int, classes: int):
     return model
 
 
-def reverse_padding(image, original_height, original_width):
+def reverse_padding(image: np.array, original_height: int, original_width: int):
     """
     Crops the padded image back to its original dimensions.
 
@@ -150,7 +139,7 @@ def reverse_padding(image, original_height, original_width):
     return transform(image=image)['image']
 
 
-def inference_loop(model: nn.Module, images: torch.Tensor):
+def inference_loop(model: nn.Module, images: torch.Tensor) -> torch.Tensor:
     gc.collect()
     outputs = None
     counter = 0
@@ -181,7 +170,7 @@ def inference_loop(model: nn.Module, images: torch.Tensor):
 
 def inference_fn(model: nn.Module, data_loader: DataLoader, data_loader_xz: DataLoader, data_loader_yz: DataLoader,
                  device: torch.device,
-                 volume_shape: Tuple):
+                 volume_shape: Tuple) -> Tuple[list, list]:
     torch.cuda.empty_cache()
     model.eval()
     rles_list = []
@@ -263,12 +252,10 @@ def main(cfg: dict):
     test_dirs = sorted(glob.glob(f"{cfg['test_dir']}/*"))
     model = return_model(cfg['model_name'], cfg['in_channels'], cfg['classes'])
     # model = nn.DataParallel(model)
-
-    model.load_state_dict(torch.load(cfg["model_path"], map_location=torch.device('cpu')), strict=False)
+    model.to(device)
+    model.load_state_dict(torch.load(cfg["model_path"], map_location=torch.device('cuda')))
     global_rle_list = []
     global_image_ids = []
-
-    model.to(device)
 
     for test_dir in test_dirs:
         test_files = sorted(glob.glob(f"{test_dir}/images/*.tif"))

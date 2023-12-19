@@ -20,8 +20,8 @@ def get_color_escape(r, g, b, background=False):
 
 tqdm_color = get_color_escape(255, 0, 0)  # Red color for example
 tqdm_style = {
-    'bar_format': f'{tqdm_color}{{l_bar}}{{bar}}| {{n_fmt}}/{{total_fmt}} [{{elapsed}}<{{remaining}}, {{rate_fmt}}{{postfix}}]{get_color_escape(255, 255, 255)}'}
-
+    'bar_format': f'{tqdm_color}{{l_bar}}{{bar}}| {{n_fmt}}/{{total_fmt}} [{{elapsed}}<{{remaining}},'
+                  f' {{rate_fmt}}{{postfix}}]{get_color_escape(255, 255, 255)}'}
 
 def train_fn(
         train_loader: DataLoader,
