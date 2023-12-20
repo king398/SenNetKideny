@@ -6,7 +6,7 @@ image_size: 1536
 batch_size: 2
 num_workers: 8
 lr: 0.00015
-model_name: tu-seresnext101d_32x8d
+model_name: tu-timm/convnext_small.fb_in22k_ft_in1k_384
 in_channels: 1
 classes: 2
 min_lr: 3e-06

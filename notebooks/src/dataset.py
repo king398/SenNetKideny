@@ -8,7 +8,7 @@ import torch
 
 class ImageDataset(Dataset):
     def __init__(self, image_paths: List[str], mask_paths: List[str], transform: Compose, kidney_rle: List[str], volume,
-                 kidney_volume, mode="xy"):
+                 kidney_volume, mask_volume, mode="xy", ):
         self.image_paths = image_paths
         self.mask_paths = mask_paths
         self.kidney_rle = kidney_rle
@@ -16,6 +16,7 @@ class ImageDataset(Dataset):
         self.volume = volume
         self.kidney_volume = kidney_volume
         self.mode = mode
+        self.mask_volume = mask_volume
 
     def __len__(self) -> int:
         return len(self.image_paths)
@@ -24,20 +25,20 @@ class ImageDataset(Dataset):
         if self.mode == "xy":
             image = self.volume[item]
             kidney_mask = self.kidney_volume[item]
+            mask = self.mask_volume[item]
         elif self.mode == "xz":
             image = self.volume[:, item]
             kidney_mask = self.kidney_volume[:, item]
+            mask = self.mask_volume[:, item]
         elif self.mode == "yz":
             image = self.volume[:, :, item]
             kidney_mask = self.kidney_volume[:, :, item]
-            image = image.transpose(1, 0, )
-            kidney_mask = kidney_mask.transpose(1, 0, )
+            mask = self.mask_volume[:, :, item]
+
         image = (image - image.min()) / (image.max() - image.min() + 0.0001)
 
-        mask = cv2.imread(self.mask_paths[item])
         mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
         mask = mask / 255
-        kidney_mask = rle_decode(self.kidney_rle[item], img_shape=mask.shape)
         mask = np.stack([mask, kidney_mask], axis=2)
         augmented = self.transform(image=image, mask=mask)
         image = augmented["image"]
@@ -54,7 +55,13 @@ class ImageDatasetOOF(Dataset):
         self.mode = mode
 
     def __len__(self) -> int:
-        return len(self.image_paths)
+        match self.mode:
+            case "xy":
+                return self.volume.shape[0]
+            case "xz":
+                return self.volume.shape[1]
+            case "yz":
+                return self.volume.shape[2]
 
     def __getitem__(self, item) -> tuple[torch.Tensor, tuple[str, ...], str]:
         if self.mode == "xy":

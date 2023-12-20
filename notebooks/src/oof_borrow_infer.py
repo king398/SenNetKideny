@@ -1,6 +1,5 @@
 import gc
 
-import albumentations
 import numpy as np
 import os
 from torch.utils.data import Dataset, DataLoader
@@ -16,9 +15,7 @@ from tqdm.auto import tqdm
 import glob
 from torch import nn
 import pandas as pd
-from albumentations import CenterCrop
 from typing import Literal
-from utils import norm_by_percentile
 from skimage import filters
 
 
@@ -33,8 +30,7 @@ def apply_hysteresis_thresholding(volume, low, high):
     """
     # Apply hysteresis thresholding to each slice in the volume
 
-    for i in range(volume.shape[0]):
-        volume[i] = filters.apply_hysteresis_threshold(volume[i], low, high)
+    volume = filters.apply_hysteresis_threshold(volume, low, high)
 
     return volume
 
@@ -106,7 +102,13 @@ class ImageDataset(Dataset):
         self.volume = volume
 
     def __len__(self) -> int:
-        return len(self.image_paths)
+        match self.mode:
+            case "xy":
+                return self.volume.shape[0]
+            case "xz":
+                return self.volume.shape[1]
+            case "yz":
+                return self.volume.shape[2]
 
     def __getitem__(self, item) -> tuple[torch.Tensor, Tuple, str]:
         match self.mode:
@@ -119,8 +121,12 @@ class ImageDataset(Dataset):
             case _:
                 raise ValueError("Invalid mode")
 
-        image_id = self.image_paths[item].split("/")[-1].split(".")[0]
-        folder_id = self.image_paths[item].split("/")[-3]
+        if self.mode == "xy":
+            image_id = self.image_paths[item].split("/")[-1].split(".")[0]
+            folder_id = self.image_paths[item].split("/")[-3]
+        else:
+            image_id = "not_applicable"
+            folder_id = "not_applicable"
         image_id = f"{folder_id}_{image_id}"
         image_shape = image.shape
         image_shape = tuple(str(element) for element in image_shape)
@@ -256,7 +262,7 @@ def inference_fn(model: nn.Module, data_loader: DataLoader, data_loader_xz: Data
 
     gc.collect()
     volume = volume / 3
-    #volume = apply_hysteresis_thresholding(volume, 0.2, 0.6)
+    # volume = apply_hysteresis_thresholding(volume, 0.1, 0.6)
     volume = ((volume > config['threshold']) * 255).astype(np.uint8)
     for output_mask in volume:
         rles_list.append(rle_encode(output_mask))
@@ -270,9 +276,9 @@ def main(cfg: dict):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     test_dirs = ["/home/mithil/PycharmProjects/SenNetKideny/data/train/kidney_3_sparse", ]
     model = return_model(cfg['model_name'], cfg['in_channels'], cfg['classes'])
-    # model = nn.DataParallel(model)
     model.to(device)
     model.load_state_dict(torch.load(cfg["model_path"], map_location=torch.device('cuda')))
+
     global_rle_list = []
     global_image_ids = []
 

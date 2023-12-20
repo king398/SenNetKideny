@@ -1,5 +1,7 @@
 import os
 import warnings
+
+import numpy as np
 import yaml
 import pandas as pd
 from accelerate import Accelerator, DistributedDataParallelKwargs
@@ -15,6 +17,7 @@ from train_fn import train_fn, validation_fn
 import argparse
 from segmentation_models_pytorch.losses import SoftBCEWithLogitsLoss
 import bitsandbytes as bnb
+import cv2
 
 
 def main(cfg):
@@ -45,6 +48,8 @@ def main(cfg):
     train_yz_kidneys_rle = list(map(lambda x: kidney_rle[f"kidney_1_dense_yz_{x.split('.')[0]}"], train_images_yz))
     train_images_yz = list(map(lambda x: f"{cfg['train_dir']}_yz/images/{x}", train_images_yz))
     train_masks_yz = list(map(lambda x: x.replace("images", "labels"), train_images_yz))
+    train_volume = np.stack([cv2.imread(f, cv2.IMREAD_GRAYSCALE) for f in train_images])
+    train_kidney_volume = np.stack([cv2.imread(f, cv2.IMREAD_GRAYSCALE) for f in train_masks])
 
     train_dataset = ImageDataset(train_images, train_masks, get_train_transform(), train_kidneys_rle)
     valid_dataset = ImageDataset(validation_images, validation_masks, get_valid_transform(),
