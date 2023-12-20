@@ -18,6 +18,25 @@ from torch import nn
 import pandas as pd
 from albumentations import CenterCrop
 from typing import Literal
+from utils import norm_by_percentile
+from skimage import filters
+
+
+def apply_hysteresis_thresholding(volume, low, high):
+    """
+    Applies hysteresis thresholding to a 3D numpy array.
+
+    :param volume: 3D numpy array.
+    :param low: Low threshold.
+    :param high: High threshold.
+    :return: Thresholded volume.
+    """
+    # Apply hysteresis thresholding to each slice in the volume
+
+    for i in range(volume.shape[0]):
+        volume[i] = filters.apply_hysteresis_threshold(volume[i], low, high)
+
+    return volume
 
 
 def choose_biggest_object(mask: np.array, threshold: float) -> np.array:
@@ -179,7 +198,6 @@ def inference_fn(model: nn.Module, data_loader: DataLoader, data_loader_xz: Data
     global_counter = 0
     for i, (images, image_shapes, image_ids) in tqdm(enumerate(data_loader), total=len(data_loader)):
         images = images.to(device, non_blocking=True).float()
-        print(images.shape)
 
         outputs = inference_loop(model, images)
 
@@ -238,6 +256,7 @@ def inference_fn(model: nn.Module, data_loader: DataLoader, data_loader_xz: Data
 
     gc.collect()
     volume = volume / 3
+    #volume = apply_hysteresis_thresholding(volume, 0.2, 0.6)
     volume = ((volume > config['threshold']) * 255).astype(np.uint8)
     for output_mask in volume:
         rles_list.append(rle_encode(output_mask))
@@ -249,7 +268,7 @@ def inference_fn(model: nn.Module, data_loader: DataLoader, data_loader_xz: Data
 def main(cfg: dict):
     seed_everything(cfg['seed'])
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    test_dirs = sorted(glob.glob(f"{cfg['test_dir']}/*"))
+    test_dirs = ["/home/mithil/PycharmProjects/SenNetKideny/data/train/kidney_3_sparse", ]
     model = return_model(cfg['model_name'], cfg['in_channels'], cfg['classes'])
     # model = nn.DataParallel(model)
     model.to(device)
@@ -280,7 +299,9 @@ def main(cfg: dict):
     submission = pd.DataFrame()
     submission['id'] = global_image_ids
     submission['rle'] = global_rle_list
-    submission.to_csv('submission.csv', index=False)
+    # get dir path from model path
+    model_dir = os.path.dirname(cfg["model_path"])
+    submission.to_csv(f"{model_dir}/oof.csv", index=False)
     print(submission.head())
 
 
@@ -289,11 +310,11 @@ config = {
     "model_name": "tu-seresnext101d_32x8d",
     "in_channels": 3,
     "classes": 2,
-    "test_dir": '/kaggle/input/blood-vessel-segmentation/test',
+    # "test_dir": '/kaggle/input/blood-vessel-segmentation/test',
     "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/seresnext101d_32x8d_pad_kidney_multiview/model.pth",
-    "batch_size": 1,
+    "batch_size": 2,
     "num_workers": 2,
-    "threshold": 0.15,
+    "threshold": 0.10,
 }
 if __name__ == "__main__":
     main(config)
