@@ -2,7 +2,7 @@ from albumentations import *
 from albumentations.pytorch import ToTensorV2
 
 
-def get_train_transform(height: int = 1312, width: int = 928) -> Compose:
+def get_train_transform(height: int = 1344, width: int = 1120) -> Compose:
     return Compose([
         PadIfNeeded(min_height=height, min_width=width),
         # HorizontalFlip(p=0.5),
@@ -27,7 +27,7 @@ def reverse_padding(image: int, original_height: int, original_width: int):
     return transform(image=image)['image']
 
 
-def get_valid_transform(height: int = 1728, width: int = 1536) -> Compose:
+def get_valid_transform(height: int = 1792, width: int = 1568) -> Compose:
     return Compose([
         PadIfNeeded(min_height=height, min_width=width),
         ToTensorV2(transpose_mask=True),

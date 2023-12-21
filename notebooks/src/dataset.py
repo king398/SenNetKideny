@@ -26,7 +26,7 @@ class ImageDataset(Dataset):
             case "yz":
                 return self.volume.shape[2]
 
-    def __getitem__(self, item) -> Tuple[torch.Tensor, torch.Tensor]:
+    def __getitem__(self, item) -> Tuple[torch.Tensor, torch.Tensor, str]:
         match self.mode:
             case "xy":
                 image = self.volume[item]
@@ -47,10 +47,12 @@ class ImageDataset(Dataset):
 
         mask = mask / 255
         mask = np.stack([mask, kidney_mask], axis=2)
+        original_shape = image.shape
         augmented = self.transform(image=image, mask=mask)
         image = augmented["image"]
         mask = augmented["mask"]
-        return image, mask
+
+        return image, mask, original_shape
 
 
 class ImageDatasetOOF(Dataset):

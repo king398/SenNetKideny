@@ -6,10 +6,11 @@ image_size: 1536
 batch_size: 2
 num_workers: 8
 lr: 0.00015
-model_name: tu-timm/tf_efficientnet_b5.ns_jft_in1k
+model_name: tu-timm/maxvit_small_tf_224.in1k
 in_channels: 3
 classes: 2
 min_lr: 3e-06
 epochs: 15
-model_dir: /home/mithil/PycharmProjects/SenNetKideny/models/tf_efficientnet_b5_pad_kidney_multiview
+model_dir: /home/mithil/PycharmProjects/SenNetKideny/models/maxvit_small_tf_224_pad_kidney_multiview
 kidneys_df: /home/mithil/PycharmProjects/SenNetKideny/data/train_rles_kidneys.csv
+valid_rle_df  : /home/mithil/PycharmProjects/SenNetKideny/data/kidney_3_dense_full.csv

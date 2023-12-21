@@ -39,7 +39,8 @@ def main(cfg):
     train_kidneys_rle = list(
         map(lambda x: kidney_rle[f"kidney_1_dense_{x.split('.')[0]}"], os.listdir(f"{cfg['train_dir']}/images")))
     train_masks = list(map(lambda x: x.replace("images", "labels"), train_images))
-    validation_kidneys_rle = list(map(lambda x: kidney_rle[f"kidney_3_sparse_{x.split('.')[0]}"], os.listdir(f"{cfg['validation_dir']}/images")))
+    validation_kidneys_rle = list(
+        map(lambda x: kidney_rle[f"kidney_3_sparse_{x.split('.')[0]}"], os.listdir(f"{cfg['validation_dir']}/images")))
     validation_masks = list(map(lambda x: x.replace("images", "labels"), validation_images))
     train_volume = np.stack([cv2.imread(f, cv2.IMREAD_GRAYSCALE) for f in train_images])
     print(train_volume.shape)
@@ -53,9 +54,9 @@ def main(cfg):
                                  kidney_volume=train_kidney_volume, mask_volume=train_mask_volume, mode="xy")
     valid_dataset = ImageDataset(transform=get_valid_transform(), volume=validation_volume,
                                  kidney_volume=validation_kidney_volume, mask_volume=validation_mask_volume, mode="xy")
-    train_dataset_xz = ImageDataset(transform=get_train_transform(height=2304, width=928), volume=train_volume,
+    train_dataset_xz = ImageDataset(transform=get_train_transform(height=2464, width=1120), volume=train_volume,
                                     kidney_volume=train_kidney_volume, mask_volume=train_mask_volume, mode="xz")
-    train_dataset_yz = ImageDataset(get_train_transform(height=2304, width=1312), volume=train_volume,
+    train_dataset_yz = ImageDataset(get_train_transform(height=2464, width=1344), volume=train_volume,
                                     kidney_volume=train_kidney_volume, mask_volume=train_mask_volume, mode="yz")
     train_loader = DataLoader(train_dataset, batch_size=cfg['batch_size'], shuffle=True, num_workers=cfg['num_workers'],
                               pin_memory=True)
@@ -75,7 +76,7 @@ def main(cfg):
         model,
         optimizer, scheduler, train_loader_yz, train_loader_xz
     )
-
+    valid_rle_df = pd.read_csv(cfg['valid_rle_df'])
     criterion = SoftBCEWithLogitsLoss()
     best_dice = -1
     for epoch in range(cfg['epochs']):
@@ -85,7 +86,7 @@ def main(cfg):
             train_loader_xz=train_loader_xz,
             train_loader_yz=train_loader_yz,
             model=model,
-            criterion=criterion,
+             criterion=criterion,
             optimizer=optimizer,
             scheduler=scheduler,
             epoch=epoch,
@@ -101,14 +102,14 @@ def main(cfg):
             epoch=epoch,
             fold=0,
             accelerator=accelerate,
+            validation_df=valid_rle_df
 
         )
         accelerate.wait_for_everyone()
-        if dice_score > best_dice:
-            best_dice = best_dice
+
         unwrapped_model = accelerate.unwrap_model(model)
         model_weights = unwrapped_model.state_dict()
-        accelerate.save(model_weights, f"{cfg['model_dir']}/model.pth")
+        accelerate.save(model_weights, f"{cfg['model_dir']}/model_epoch_{epoch}.pth")
 
     accelerate.end_training()
 

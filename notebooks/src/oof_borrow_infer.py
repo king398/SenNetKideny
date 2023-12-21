@@ -262,8 +262,8 @@ def inference_fn(model: nn.Module, data_loader: DataLoader, data_loader_xz: Data
 
     gc.collect()
     volume = volume / 3
-    # volume = apply_hysteresis_thresholding(volume, 0.1, 0.6)
-    volume = ((volume > config['threshold']) * 255).astype(np.uint8)
+    volume = apply_hysteresis_thresholding(volume, 0.1, 0.6)
+    volume = (volume * 255).astype(np.uint8)
     for output_mask in volume:
         rles_list.append(rle_encode(output_mask))
     del volume
@@ -279,11 +279,17 @@ def main(cfg: dict):
     model.to(device)
     model.load_state_dict(torch.load(cfg["model_path"], map_location=torch.device('cuda')))
 
+    valid_rle = pd.read_csv("/home/mithil/PycharmProjects/SenNetKideny/data/kidney_3_dense_full.csv")
+    valid_rle['id'] = valid_rle['id'].apply(lambda x: x.replace("kidney_3_dense", "kidney_3_sparse"))
     global_rle_list = []
     global_image_ids = []
 
     for test_dir in test_dirs:
-        test_files = sorted(glob.glob(f"{test_dir}/images/*.tif"))
+        test_files = []
+        for i in sorted(glob.glob(f"{test_dir}/images/*.tif")):
+            image_id = f"kidney_3_sparse_{i.split('/')[-1].split('.')[0]}"
+            if image_id in valid_rle['id'].values:
+                test_files.append(i)
         volume = np.stack([cv2.imread(i, cv2.IMREAD_GRAYSCALE) for i in test_files])
         test_dataset_xy = ImageDataset(test_files, get_valid_transform, mode='xy', volume=volume)
         test_dataset_xz = ImageDataset(test_files, get_valid_transform, mode='xz',
@@ -319,7 +325,7 @@ config = {
     # "test_dir": '/kaggle/input/blood-vessel-segmentation/test',
     "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/seresnext101d_32x8d_pad_kidney_multiview/model.pth",
     "batch_size": 2,
-    "num_workers": 2,
+    "num_workers": 8,
     "threshold": 0.10,
 }
 if __name__ == "__main__":

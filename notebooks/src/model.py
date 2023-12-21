@@ -22,6 +22,7 @@ class ReturnModel(nn.Module):
             in_channels=in_channels,
             classes=classes,
         )
+        self.unet.encoder.model.set_grad_checkpointing()
 
     def forward(self, x):
         # Forward pass through Unet

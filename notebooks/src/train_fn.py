@@ -9,6 +9,7 @@ from accelerate import Accelerator
 from torch.cuda.amp import autocast
 import torch.nn.functional as F
 from augmentations import reverse_padding
+import pandas as pd
 
 dice = Dice()
 dice_valid = Dice_Valid()
@@ -43,7 +44,7 @@ def train_fn(
     loss_metric = 0
 
     stream = tqdm(train_loader, total=len(train_loader), disable=not accelerator.is_local_main_process, **tqdm_style)
-    for i, (images, masks) in enumerate(stream):
+    for i, (images, masks, original_shape) in enumerate(stream):
         masks = masks.float()
         images = images.float()
         output = model(images)
@@ -62,7 +63,7 @@ def train_fn(
     stream_xz = tqdm(train_loader_xz, total=len(train_loader_xz), disable=not accelerator.is_local_main_process,
                      **tqdm_style)
 
-    for i, (images, masks) in enumerate(stream_xz):
+    for i, (images, masks, original_shape) in enumerate(stream_xz):
         masks = masks.float()
         images = images.float()
         output = model(images)
@@ -81,8 +82,7 @@ def train_fn(
     torch.cuda.empty_cache()
     stream_yz = tqdm(train_loader_yz, total=len(train_loader_yz), disable=not accelerator.is_local_main_process,
                      **tqdm_style)
-    model.module.unet.encoder.model.set_grad_checkpointing()
-    for i, (images, masks) in enumerate(stream_yz):
+    for i, (images, masks, original_shape) in enumerate(stream_yz):
         masks = masks.float()
         images = images.float()
         output = model(images)
@@ -98,7 +98,6 @@ def train_fn(
         scheduler.step()
         accelerator.log({f"train_loss_{fold}": loss_metric, f"train_dice_batch_{fold}": dice_batch.item(),
                          f"lr_{fold}": optimizer.param_groups[0]['lr']})
-    model.module.unet.encoder.model.set_grad_checkpointing(False)
 
 
 def validation_fn(
@@ -108,6 +107,7 @@ def validation_fn(
         epoch: int,
         accelerator: Accelerator,
         fold: int,
+        validation_df: pd.DataFrame,
 ):
     gc.collect()
     torch.cuda.empty_cache()
@@ -117,7 +117,7 @@ def validation_fn(
     dice_metric = []
     pd_dataframe = {"id": [], "rle": []}
     with torch.no_grad():
-        for i, (images, masks) in enumerate(stream):
+        for i, (images, masks, original_shape) in enumerate(stream):
             masks = masks.float()
             images = images.float()
             output = model(images)
