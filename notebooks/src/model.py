@@ -6,18 +6,25 @@ from torch.nn import Module
 import torch
 import math
 
-
-
-
 # Example usage
-def return_model(model_name: str, in_channels: int, classes: int):
-    model = smp.Unet(
-        encoder_name=model_name,
-        encoder_weights="imagenet",
-        in_channels=in_channels,
-        classes=classes,
-        encoder_depth=4,
-        decoder_channels=[256, 128, 64, 32],
+import torch
+import torch.nn as nn
+import segmentation_models_pytorch as smp
 
-    )
-    return model
+
+class ReturnModel(nn.Module):
+    def __init__(self, model_name: str, in_channels: int, classes: int):
+        super(ReturnModel, self).__init__()
+        # Initialize the Unet model
+        self.unet = smp.Unet(
+            encoder_name=model_name,
+            encoder_weights="imagenet",
+            in_channels=in_channels,
+            classes=classes,
+        )
+
+    def forward(self, x):
+        # Forward pass through Unet
+        x = self.unet(x)
+        # Upscale the output
+        return x

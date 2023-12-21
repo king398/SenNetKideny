@@ -1,3 +1,5 @@
+import numpy as np
+
 from utils import *
 from torch.utils.data import Dataset
 import cv2
@@ -7,11 +9,8 @@ import torch
 
 
 class ImageDataset(Dataset):
-    def __init__(self, image_paths: List[str], mask_paths: List[str], transform: Compose, kidney_rle: List[str], volume,
-                 kidney_volume, mask_volume, mode="xy", ):
-        self.image_paths = image_paths
-        self.mask_paths = mask_paths
-        self.kidney_rle = kidney_rle
+    def __init__(self, transform: Compose, volume: np.array,
+                 kidney_volume: np.array, mask_volume: np.array, mode: Literal['xy', 'xz', 'yz'] = "xy", ):
         self.transform = transform
         self.volume = volume
         self.kidney_volume = kidney_volume
@@ -19,25 +18,33 @@ class ImageDataset(Dataset):
         self.mask_volume = mask_volume
 
     def __len__(self) -> int:
-        return len(self.image_paths)
+        match self.mode:
+            case "xy":
+                return self.volume.shape[0]
+            case "xz":
+                return self.volume.shape[1]
+            case "yz":
+                return self.volume.shape[2]
 
     def __getitem__(self, item) -> Tuple[torch.Tensor, torch.Tensor]:
-        if self.mode == "xy":
-            image = self.volume[item]
-            kidney_mask = self.kidney_volume[item]
-            mask = self.mask_volume[item]
-        elif self.mode == "xz":
-            image = self.volume[:, item]
-            kidney_mask = self.kidney_volume[:, item]
-            mask = self.mask_volume[:, item]
-        elif self.mode == "yz":
-            image = self.volume[:, :, item]
-            kidney_mask = self.kidney_volume[:, :, item]
-            mask = self.mask_volume[:, :, item]
-
+        match self.mode:
+            case "xy":
+                image = self.volume[item]
+                kidney_mask = self.kidney_volume[item]
+                mask = self.mask_volume[item]
+            case "xz":
+                image = self.volume[:, item]
+                kidney_mask = self.kidney_volume[:, item]
+                mask = self.mask_volume[:, item]
+            case "yz":
+                image = self.volume[:, :, item]
+                kidney_mask = self.kidney_volume[:, :, item]
+                mask = self.mask_volume[:, :, item]
+            case _:
+                raise ValueError("mode must be either xz or yz or xy")
+        image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
         image = (image - image.min()) / (image.max() - image.min() + 0.0001)
 
-        mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
         mask = mask / 255
         mask = np.stack([mask, kidney_mask], axis=2)
         augmented = self.transform(image=image, mask=mask)

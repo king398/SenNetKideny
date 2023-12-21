@@ -23,6 +23,7 @@ tqdm_style = {
     'bar_format': f'{tqdm_color}{{l_bar}}{{bar}}| {{n_fmt}}/{{total_fmt}} [{{elapsed}}<{{remaining}},'
                   f' {{rate_fmt}}{{postfix}}]{get_color_escape(255, 255, 255)}'}
 
+
 def train_fn(
         train_loader: DataLoader,
         train_loader_xz: DataLoader,
@@ -80,7 +81,7 @@ def train_fn(
     torch.cuda.empty_cache()
     stream_yz = tqdm(train_loader_yz, total=len(train_loader_yz), disable=not accelerator.is_local_main_process,
                      **tqdm_style)
-
+    model.module.unet.encoder.model.set_grad_checkpointing()
     for i, (images, masks) in enumerate(stream_yz):
         masks = masks.float()
         images = images.float()
@@ -97,6 +98,7 @@ def train_fn(
         scheduler.step()
         accelerator.log({f"train_loss_{fold}": loss_metric, f"train_dice_batch_{fold}": dice_batch.item(),
                          f"lr_{fold}": optimizer.param_groups[0]['lr']})
+    model.module.unet.encoder.model.set_grad_checkpointing(False)
 
 
 def validation_fn(
