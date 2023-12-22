@@ -107,7 +107,6 @@ def validation_fn(
         epoch: int,
         accelerator: Accelerator,
         fold: int,
-        validation_df: pd.DataFrame,
 ):
     gc.collect()
     torch.cuda.empty_cache()

@@ -16,6 +16,7 @@ class ReturnModel(nn.Module):
             in_channels=in_channels,
             classes=classes,
         )
+        self.unet.encoder.model.set_grad_checkpointing(True)
 
     def forward(self, x):
         # Pad the input

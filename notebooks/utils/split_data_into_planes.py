@@ -5,13 +5,13 @@ from notebooks.src.utils import rle_decode, rle_encode
 
 import pandas as pd
 
-volume = "kidney_1_dense"
+volume = "kidney_3_sparse"
 data_dir = f"/home/mithil/PycharmProjects/SenNetKideny/data/train/{volume}"
 kidneys_rle = pd.read_csv("/home/mithil/PycharmProjects/SenNetKideny/data/train_rles_kidneys.csv")
 # convert kidney_rle to a dict
 kidneys_rle_dict = {kidneys_rle['id'][i]: kidneys_rle['kidney_rle'][i] for i in range(len(kidneys_rle))}
 # only keep those rows which have kidney_1_dense in the ids
-kidneys_rle = kidneys_rle[kidneys_rle['id'].str.contains('kidney_3_sparse')].reset_index(drop=True)
+kidneys_rle = kidneys_rle[kidneys_rle['id'].str.contains(volume)].reset_index(drop=True)
 masks = []
 images = []
 kidney_masks = []
@@ -31,18 +31,18 @@ os.makedirs(f"/home/mithil/PycharmProjects/SenNetKideny/data/train/{volume}_xz/i
 os.makedirs(f"/home/mithil/PycharmProjects/SenNetKideny/data/train/{volume}_xz/labels/", exist_ok=True)
 os.makedirs(f"/home/mithil/PycharmProjects/SenNetKideny/data/train/{volume}_yz/images/", exist_ok=True)
 os.makedirs(f"/home/mithil/PycharmProjects/SenNetKideny/data/train/{volume}_yz/labels/", exist_ok=True)
-for i in range(len(dataset_xz[0])):
-    cv2.imwrite(f"/home/mithil/PycharmProjects/SenNetKideny/data/train/{volume}_xz/images/{i:04d}.tif",
-                dataset_xz[0][:, i].transpose(1, 0))
-    cv2.imwrite(f"/home/mithil/PycharmProjects/SenNetKideny/data/train/{volume}_xz/labels/{i:04d}.tif",
-                dataset_xz[1][:, i].transpose(1, 0))
-    kidneys_rle_dict.update({f"{volume}_xz_{i:04d}": rle_encode(dataset_xz[2][:, i].transpose(1, 0))})
-for i in range(len(dataset_yz[0])):
-    cv2.imwrite(f"/home/mithil/PycharmProjects/SenNetKideny/data/train/{volume}_yz/images/{i:04d}.tif",
-                dataset_yz[0][:, :, i])
-    cv2.imwrite(f"/home/mithil/PycharmProjects/SenNetKideny/data/train/{volume}_yz/labels/{i:04d}.tif",
-                dataset_yz[1][:, :, i])
-    kidneys_rle_dict.update({f"{volume}_yz_{i:04d}": rle_encode(dataset_yz[2][:, :, i])})
+for p in range(images.shape[1]):
+    cv2.imwrite(f"/home/mithil/PycharmProjects/SenNetKideny/data/train/{volume}_xz/images/{p:04d}.tif",
+                images[:, p])
+    cv2.imwrite(f"/home/mithil/PycharmProjects/SenNetKideny/data/train/{volume}_xz/labels/{p:04d}.tif",
+                masks[:, p])
+    kidneys_rle_dict.update({f"{volume}_xz_{p:04d}": rle_encode(kidney_masks[:, p])})
+for p in range(images.shape[2]):
+    cv2.imwrite(f"/home/mithil/PycharmProjects/SenNetKideny/data/train/{volume}_yz/images/{p:04d}.tif",
+                images[:, :, p])
+    cv2.imwrite(f"/home/mithil/PycharmProjects/SenNetKideny/data/train/{volume}_yz/labels/{p:04d}.tif",
+                masks[:, :, p])
+    kidneys_rle_dict.update({f"{volume}_yz_{p:04d}": rle_encode(kidney_masks[:, :, p])})
 
 kidneys_rle_dict = pd.DataFrame(kidneys_rle_dict.items(), columns=['id', 'kidney_rle'])
 kidneys_rle_dict.to_csv(f"/home/mithil/PycharmProjects/SenNetKideny/data/train_rles_kidneys.csv", index=False)
