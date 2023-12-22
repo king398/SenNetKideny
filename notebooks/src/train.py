@@ -67,7 +67,7 @@ def main(cfg):
     train_loader_yz = DataLoader(train_dataset_yz, batch_size=cfg['batch_size'], shuffle=True,
                                  num_workers=cfg['num_workers'], pin_memory=True)
     model = ReturnModel(cfg['model_name'], in_channels=cfg['in_channels'], classes=cfg['classes'])
-    optimizer = bnb.optim.AdamW8bit(model.parameters(), lr=float(cfg['lr']))
+    optimizer = torch.optim.AdamW(model.parameters(), lr=float(cfg['lr']))
     scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=int(len(train_loader) * 5),
                                                                      eta_min=float(cfg['min_lr']))
     train_loader, valid_loader, model, optimizer, scheduler, train_loader_yz, train_loader_xz = accelerate.prepare(
@@ -76,7 +76,7 @@ def main(cfg):
         model,
         optimizer, scheduler, train_loader_yz, train_loader_xz
     )
-    valid_rle_df = pd.read_csv(cfg['valid_rle_df'])
+    valid_rle_df = None
     criterion = SoftBCEWithLogitsLoss()
     best_dice = -1
     for epoch in range(cfg['epochs']):
@@ -86,7 +86,7 @@ def main(cfg):
             train_loader_xz=train_loader_xz,
             train_loader_yz=train_loader_yz,
             model=model,
-             criterion=criterion,
+            criterion=criterion,
             optimizer=optimizer,
             scheduler=scheduler,
             epoch=epoch,

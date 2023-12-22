@@ -44,7 +44,6 @@ class ImageDataset(Dataset):
                 raise ValueError("mode must be either xz or yz or xy")
         image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
         image = (image - image.min()) / (image.max() - image.min() + 0.0001)
-
         mask = mask / 255
         mask = np.stack([mask, kidney_mask], axis=2)
         original_shape = image.shape

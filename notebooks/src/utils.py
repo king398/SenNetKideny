@@ -7,6 +7,7 @@ import random
 import accelerate
 import yaml
 import cv2
+from skimage import filters
 
 
 class Dice(nn.Module):
@@ -19,15 +20,17 @@ class Dice(nn.Module):
 
         return dice
 
+
 def norm_by_percentile(volume, low=10, high=99.8, alpha=0.01):
-    xmin = np.percentile(volume,low)
-    xmax = np.percentile(volume,high)
-    x = (volume-xmin)/(xmax-xmin)
+    xmin = np.percentile(volume, low)
+    xmax = np.percentile(volume, high)
+    x = (volume - xmin) / (xmax - xmin)
     if 1:
-        x[x>1]=(x[x>1]-1)*alpha +1
-        x[x<0]=(x[x<0])*alpha
-    #x = np.clip(x,0,1)
+        x[x > 1] = (x[x > 1] - 1) * alpha + 1
+        x[x < 0] = (x[x < 0]) * alpha
+    # x = np.clip(x,0,1)
     return x
+
 
 class Dice_Valid(nn.Module):
     def __init__(self, threshold=0.5):
@@ -125,3 +128,27 @@ def choose_biggest_object(mask, threshold):
             max_label = l
     processed = (label == max_label).astype(np.uint8)
     return processed
+
+
+def apply_hysteresis_thresholding(volume: np.array, low: float, high: float, chunk_size: int = 32):
+    """
+    Applies hysteresis thresholding to a 3D numpy array.
+
+    :param volume: 3D numpy array.
+    :param low: Low threshold.
+    :param high: High threshold.
+    :param chunk_size: Size of the chunks to process at once.
+    :return: Thresholded volume.
+    """
+    # Apply hysteresis thresholding to each slice in the volume
+
+    D, H, W = volume.shape
+    predict = np.zeros((D, H, W), np.uint8)
+
+    for i in range(0, D, chunk_size // 2):
+        predict[i:i + chunk_size] = np.maximum(
+            filters.apply_hysteresis_threshold(volume[i:i + chunk_size], low, high),
+            predict[i:i + chunk_size]
+        )
+
+    return predict

@@ -1,5 +1,7 @@
-import gc
+import os
 
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+import gc
 import numpy as np
 import os
 from torch.utils.data import Dataset, DataLoader
@@ -17,46 +19,7 @@ from torch import nn
 import pandas as pd
 from typing import Literal
 from skimage import filters
-
-
-def apply_hysteresis_thresholding(volume, low, high):
-    """
-    Applies hysteresis thresholding to a 3D numpy array.
-
-    :param volume: 3D numpy array.
-    :param low: Low threshold.
-    :param high: High threshold.
-    :return: Thresholded volume.
-    """
-    # Apply hysteresis thresholding to each slice in the volume
-
-    volume = filters.apply_hysteresis_threshold(volume, low, high)
-
-    return volume
-
-
-def choose_biggest_object(mask: np.array, threshold: float) -> np.array:
-    mask = ((mask > threshold) * 255).astype(np.uint8)
-    num_label, label, stats, centroid = cv2.connectedComponentsWithStats(mask, connectivity=8)
-    max_label = -1
-    max_area = -1
-    for l in range(1, num_label):
-        if stats[l, cv2.CC_STAT_AREA] >= max_area:
-            max_area = stats[l, cv2.CC_STAT_AREA]
-            max_label = l
-    processed = (label == max_label).astype(np.uint8)
-    return processed
-
-
-def rle_encode(mask: np.array) -> str:
-    pixel = mask.flatten()
-    pixel = np.concatenate([[0], pixel, [0]])
-    run = np.where(pixel[1:] != pixel[:-1])[0] + 1
-    run[1::2] -= run[::2]
-    rle = ' '.join(str(r) for r in run)
-    if rle == '':
-        rle = '1 0'
-    return rle
+from utils import *
 
 
 def get_valid_transform(image: np.array, original_height: int, original_width: int) -> np.array:
@@ -70,8 +33,8 @@ def get_valid_transform(image: np.array, original_height: int, original_width: i
     """
     # Define the cropping transformation
     # round up original height and width to nearest 32
-    original_height = int(np.ceil(original_height / 32) * 32)
-    original_width = int(np.ceil(original_width / 32) * 32)
+    original_height = int(np.ceil(original_height / 224) * 224)
+    original_width = int(np.ceil(original_width / 224) * 224)
     transform = Compose([
         PadIfNeeded(min_height=original_height, min_width=original_width),
         ToTensorV2(),
@@ -79,18 +42,6 @@ def get_valid_transform(image: np.array, original_height: int, original_width: i
 
     # Apply the transformation
     return transform(image=image)['image']
-
-
-def seed_everything(seed: int) -> None:
-    os.environ['PYTHONHASHSEED'] = str(seed)
-    np.random.seed(seed)
-    random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = True
-    torch.backends.cuda.matmul.allow_tf32 = True  # allow tf32 on matmul
-    torch.backends.cudnn.allow_tf32 = True  # allow tf32 on cudnn
 
 
 class ImageDataset(Dataset):
@@ -137,15 +88,24 @@ class ImageDataset(Dataset):
         return image, image_shape, image_id
 
 
-def return_model(model_name: str, in_channels: int, classes: int) -> nn.Module:
-    model = smp.Unet(
-        encoder_name=model_name,
-        encoder_weights=None,
-        in_channels=in_channels,
-        classes=classes,
+class ReturnModel(nn.Module):
+    def __init__(self, model_name: str, in_channels: int, classes: int, inference: bool = False):
+        super(ReturnModel, self).__init__()
+        # Initialize the Unet model
+        self.unet = smp.Unet(
+            encoder_name=model_name,
+            encoder_weights="imagenet",
+            in_channels=in_channels,
+            classes=classes,
+        )
+        if not inference:
+            self.unet.encoder.model.set_grad_checkpointing()
 
-    )
-    return model
+    def forward(self, x):
+        # Forward pass through Unet
+        x = self.unet(x)
+        # Upscale the output
+        return x
 
 
 def reverse_padding(image: np.array, original_height: int, original_width: int):
@@ -262,7 +222,7 @@ def inference_fn(model: nn.Module, data_loader: DataLoader, data_loader_xz: Data
 
     gc.collect()
     volume = volume / 3
-    volume = apply_hysteresis_thresholding(volume, 0.1, 0.6)
+    volume = apply_hysteresis_thresholding(volume, 0.2, 0.6)
     volume = (volume * 255).astype(np.uint8)
     for output_mask in volume:
         rles_list.append(rle_encode(output_mask))
@@ -275,7 +235,7 @@ def main(cfg: dict):
     seed_everything(cfg['seed'])
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     test_dirs = ["/home/mithil/PycharmProjects/SenNetKideny/data/train/kidney_3_sparse", ]
-    model = return_model(cfg['model_name'], cfg['in_channels'], cfg['classes'])
+    model = ReturnModel(cfg['model_name'], cfg['in_channels'], cfg['classes'], inference=True)
     model.to(device)
     model.load_state_dict(torch.load(cfg["model_path"], map_location=torch.device('cuda')))
 
@@ -298,9 +258,9 @@ def main(cfg: dict):
                                        volume=volume)
         test_loader = DataLoader(test_dataset_xy, batch_size=cfg['batch_size'], shuffle=False,
                                  num_workers=cfg['num_workers'], pin_memory=True)
-        test_loader_xz = DataLoader(test_dataset_xz, batch_size=cfg['batch_size'], shuffle=False,
+        test_loader_xz = DataLoader(test_dataset_xz, batch_size=cfg['batch_size'] * 2, shuffle=False,
                                     num_workers=cfg['num_workers'], pin_memory=True)
-        test_loader_yz = DataLoader(test_dataset_yz, batch_size=cfg['batch_size'], shuffle=False,
+        test_loader_yz = DataLoader(test_dataset_yz, batch_size=cfg['batch_size'] * 2, shuffle=False,
                                     num_workers=cfg['num_workers'], pin_memory=True)
         rles_list, image_ids = inference_fn(model=model, data_loader=test_loader, data_loader_xz=test_loader_xz,
                                             data_loader_yz=test_loader_yz,
@@ -313,20 +273,19 @@ def main(cfg: dict):
     submission['rle'] = global_rle_list
     # get dir path from model path
     model_dir = os.path.dirname(cfg["model_path"])
-    submission.to_csv(f"{model_dir}/oof.csv", index=False)
+    submission.to_csv(f"{model_dir}/oof_epoch_10.csv", index=False)
     print(submission.head())
 
 
 config = {
     "seed": 42,
-    "model_name": "tu-seresnext101d_32x8d",
+    "model_name": "tu-timm/maxvit_small_tf_224.in1k",
     "in_channels": 3,
     "classes": 2,
     # "test_dir": '/kaggle/input/blood-vessel-segmentation/test',
-    "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/seresnext101d_32x8d_pad_kidney_multiview/model.pth",
-    "batch_size": 2,
+    "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/maxvit_small_tf_224_pad_kidney_multiview/model_epoch_10.pth",
+    "batch_size": 1,
     "num_workers": 8,
-    "threshold": 0.10,
 }
 if __name__ == "__main__":
     main(config)

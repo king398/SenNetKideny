@@ -18,6 +18,31 @@ from torch import nn
 import pandas as pd
 from albumentations import CenterCrop
 from typing import Literal
+from skimage import filters
+
+
+def apply_hysteresis_thresholding(volume: np.array, low: float, high: float, chunk_size: int = 32):
+    """
+    Applies hysteresis thresholding to a 3D numpy array.
+
+    :param volume: 3D numpy array.
+    :param low: Low threshold.
+    :param high: High threshold.
+    :param chunk_size: Size of the chunks to process at once.
+    :return: Thresholded volume.
+    """
+    # Apply hysteresis thresholding to each slice in the volume
+
+    D, H, W = volume.shape
+    predict = np.zeros((D, H, W), np.uint8)
+
+    for i in range(0, D, chunk_size // 2):
+        predict[i:i + chunk_size] = np.maximum(
+            filters.apply_hysteresis_threshold(volume[i:i + chunk_size], low, high),
+            predict[i:i + chunk_size]
+        )
+
+    return predict
 
 
 def choose_biggest_object(mask: np.array, threshold: float) -> np.array:
@@ -87,7 +112,13 @@ class ImageDataset(Dataset):
         self.volume = volume
 
     def __len__(self) -> int:
-        return len(self.image_paths)
+        match self.mode:
+            case "xy":
+                return self.volume.shape[0]
+            case "xz":
+                return self.volume.shape[1]
+            case "yz":
+                return self.volume.shape[2]
 
     def __getitem__(self, item) -> tuple[torch.Tensor, Tuple, str]:
         match self.mode:
@@ -100,8 +131,13 @@ class ImageDataset(Dataset):
             case _:
                 raise ValueError("Invalid mode")
 
-        image_id = self.image_paths[item].split("/")[-1].split(".")[0]
-        folder_id = self.image_paths[item].split("/")[-3]
+        if self.mode == "xy":
+            image_id = self.image_paths[item].split("/")[-1].split(".")[0]
+            folder_id = self.image_paths[item].split("/")[-3]
+        else:
+            image_id = "Na"
+            folder_id = "Na"
+
         image_id = f"{folder_id}_{image_id}"
         image_shape = image.shape
         image_shape = tuple(str(element) for element in image_shape)
@@ -179,7 +215,6 @@ def inference_fn(model: nn.Module, data_loader: DataLoader, data_loader_xz: Data
     global_counter = 0
     for i, (images, image_shapes, image_ids) in tqdm(enumerate(data_loader), total=len(data_loader)):
         images = images.to(device, non_blocking=True).float()
-        print(images.shape)
 
         outputs = inference_loop(model, images)
 
@@ -238,7 +273,8 @@ def inference_fn(model: nn.Module, data_loader: DataLoader, data_loader_xz: Data
 
     gc.collect()
     volume = volume / 3
-    volume = ((volume > config['threshold']) * 255).astype(np.uint8)
+    volume = apply_hysteresis_thresholding(volume, 0.2, 0.6)
+    volume = (volume  * 255).astype(np.uint8)
     for output_mask in volume:
         rles_list.append(rle_encode(output_mask))
     del volume
@@ -290,8 +326,8 @@ config = {
     "in_channels": 3,
     "classes": 2,
     "test_dir": '/kaggle/input/blood-vessel-segmentation/test',
-    "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/seresnext101d_32x8d_pad_kidney_multiview/model.pth",
-    "batch_size": 1,
+    "model_path": "/kaggle/input/senet-models/seresnext101d_32x8d_pad_kidney_multiview/model.pth",
+    "batch_size": 2,
     "num_workers": 2,
     "threshold": 0.15,
 }
