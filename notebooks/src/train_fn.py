@@ -41,7 +41,7 @@ def train_fn(
 
     stream = tqdm(train_loader, total=len(train_loader), disable=not accelerator.is_local_main_process, **tqdm_style)
     for i, (images, masks, original_shape) in enumerate(stream):
-        break
+
         masks = masks.float()
         images = images.float()
         output = model(images)
@@ -61,7 +61,7 @@ def train_fn(
                      **tqdm_style)
 
     for i, (images, masks, original_shape) in enumerate(stream_xz):
-        break
+
         masks = masks.float()
         images = images.float()
         output = model(images)
@@ -81,7 +81,7 @@ def train_fn(
     stream_yz = tqdm(train_loader_yz, total=len(train_loader_yz), disable=not accelerator.is_local_main_process,
                      **tqdm_style)
     for i, (images, masks, original_shape) in enumerate(stream_yz):
-        break
+
         masks = masks.float()
         images = images.float()
         output = model(images)
