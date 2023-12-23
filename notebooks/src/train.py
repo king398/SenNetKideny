@@ -74,6 +74,7 @@ def main(cfg):
 
     criterion = SoftBCEWithLogitsLoss()
     best_dice = -1
+    validation_df = pd.read_csv(cfg['validation_df'])
     for epoch in range(cfg['epochs']):
         train_fn(
 
@@ -97,10 +98,10 @@ def main(cfg):
             epoch=epoch,
             fold=0,
             accelerator=accelerate,
+            validation_df=validation_df
 
         )
         accelerate.wait_for_everyone()
-        best_dice = best_dice
         unwrapped_model = accelerate.unwrap_model(model)
         model_weights = unwrapped_model.state_dict()
         accelerate.save(model_weights, f"{cfg['model_dir']}/model_epoch_{epoch}.pth")

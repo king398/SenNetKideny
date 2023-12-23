@@ -10,6 +10,7 @@ from torch.cuda.amp import autocast
 import torch.nn.functional as F
 from augmentations import reverse_padding
 import pandas as pd
+from metric import compute_surface_dice_score
 
 dice = Dice()
 dice_valid = Dice_Valid()
@@ -19,7 +20,7 @@ def get_color_escape(r, g, b, background=False):
     return f'\033[{"48" if background else "38"};2;{r};{g};{b}m'
 
 
-tqdm_color = get_color_escape(255, 0, 0)  # Red color for example
+tqdm_color = get_color_escape(0, 255, 0)  # Red color for example
 tqdm_style = {
     'bar_format': f'{tqdm_color}{{l_bar}}{{bar}}| {{n_fmt}}/{{total_fmt}} [{{elapsed}}<{{remaining}},'
                   f' {{rate_fmt}}{{postfix}}]{get_color_escape(255, 255, 255)}'}
@@ -107,14 +108,15 @@ def validation_fn(
         epoch: int,
         accelerator: Accelerator,
         fold: int,
+        validation_df: pd.DataFrame
 ):
     gc.collect()
     torch.cuda.empty_cache()
     model.eval()
     stream = tqdm(valid_loader, total=len(valid_loader), disable=not accelerator.is_local_main_process, **tqdm_style)
     loss_metric = 0
-    dice_metric = []
     pd_dataframe = {"id": [], "rle": []}
+    j = 0
     with torch.no_grad():
         for i, (images, masks, original_shape) in enumerate(stream):
             masks = masks.float()
@@ -123,14 +125,27 @@ def validation_fn(
             loss = criterion(output, masks)
             outputs, masks = accelerator.gather((output, masks))
             loss_metric += loss.item() / (i + 1)
-            outputs = outputs.sigmoid()
-            outputs = outputs[:, 0, :, :] * outputs[:, 1, :, :]
-            dice_batch = dice_valid(outputs, masks[:, 0, :, :])
-            dice_metric.append(dice_batch.item())
+            outputs = outputs.sigmoid().detach().cpu().float().numpy()
+            # outputs = outputs[:, 0, :, :] * outputs[:, 1, :, :]
+            # dice_batch = dice_valid(outputs, masks[:, 0, :, :])
             stream.set_description(
-                f"Epoch:{epoch + 1}, valid_loss: {loss_metric:.5f}, dice_batch: {dice_batch.item():.5f}")
-            accelerator.log({f"valid_loss_{fold}": loss_metric, f"valid_dice_batch_{fold}": dice_batch.item()})
-    accelerator.print(f"Epoch:{epoch + 1}, valid_loss: {loss_metric:.5f}, dice: {np.mean(dice_metric):.5f}")
+                f"Epoch:{epoch + 1}, valid_loss: {loss_metric:.5f}, ")
+            for image in outputs:
+                kidney = image[1, :, :]
+                kidney = choose_biggest_object(kidney, 0.5)
+                output_mask = image[0, :, :]
+                output_mask = ((output_mask > 0.15) * kidney)
+                rle_mask = rle_encode(output_mask)
+                pd_dataframe["id"].append(f"kidney_3_dense_{j:04d}")
+                pd_dataframe["rle"].append(rle_mask)
+
+            accelerator.log({f"valid_loss_{fold}": loss_metric})
+    # drop all the rows from pd_dataframe which ids are not present in validation_df
+    pd_dataframe = pd.DataFrame(pd_dataframe)
+    pd_dataframe = pd_dataframe[pd_dataframe['id'].isin(validation_df['id'])]
+    surface_dice = compute_surface_dice_score(pd_dataframe, validation_df)
+    accelerator.print(f"Epoch:{epoch + 1}, valid_loss: {loss_metric:.5f} surface_dice: {surface_dice:.5f}")
+    accelerator.log({f"surface_dice_{fold}": surface_dice})
     return np.mean(dice_metric)
 
 

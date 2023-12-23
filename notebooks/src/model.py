@@ -16,12 +16,13 @@ class ReturnModel(nn.Module):
             in_channels=in_channels,
             classes=classes,
         )
-        self.unet.encoder.model.set_grad_checkpointing(True)
+        if not inference:
+            self.unet.encoder.model.set_grad_checkpointing(True)
 
     def forward(self, x):
         # Pad the input
         original_size = x.shape[2:]
-        x, pad = self._pad_to_32(x)
+        x, pad = self._pad_image(x)
 
         # Forward pass through Unet
         x = self.unet(x)
@@ -30,10 +31,10 @@ class ReturnModel(nn.Module):
         x = self._unpad(x, original_size, pad)
         return x
 
-    def _pad_to_32(self, x):
+    def _pad_image(self, x):
         h, w = x.shape[2], x.shape[3]
-        h_pad = (32 - h % 32) % 32
-        w_pad = (32 - w % 32) % 32
+        h_pad = (224 - h % 224) % 224
+        w_pad = (224 - w % 224) % 224
 
         # Calculate padding
         pad = [w_pad // 2, w_pad - w_pad // 2, h_pad // 2, h_pad - h_pad // 2]
