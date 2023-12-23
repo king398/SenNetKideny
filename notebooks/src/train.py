@@ -75,6 +75,8 @@ def main(cfg):
     criterion = SoftBCEWithLogitsLoss()
     best_dice = -1
     validation_df = pd.read_csv(cfg['validation_df'])
+    # remove all the rows which do not contain kidney_3_dense in the id column
+    validation_df = validation_df[validation_df['id'].str.contains("kidney_3_dense")].reset_index(drop=True)
     for epoch in range(cfg['epochs']):
         train_fn(
 

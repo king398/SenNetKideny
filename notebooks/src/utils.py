@@ -10,6 +10,10 @@ import cv2
 from skimage import filters
 
 
+def get_color_escape(r, g, b, background=False):
+    return f'\033[{"48" if background else "38"};2;{r};{g};{b}m'
+
+
 class Dice(nn.Module):
     def __init__(self, threshold=0.5):
         super(Dice, self).__init__()

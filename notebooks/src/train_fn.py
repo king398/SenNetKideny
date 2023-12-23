@@ -15,12 +15,7 @@ from metric import compute_surface_dice_score
 dice = Dice()
 dice_valid = Dice_Valid()
 
-
-def get_color_escape(r, g, b, background=False):
-    return f'\033[{"48" if background else "38"};2;{r};{g};{b}m'
-
-
-tqdm_color = get_color_escape(0, 255, 0)  # Red color for example
+tqdm_color = get_color_escape(0, 229, 255)  # Red color for example
 tqdm_style = {
     'bar_format': f'{tqdm_color}{{l_bar}}{{bar}}| {{n_fmt}}/{{total_fmt}} [{{elapsed}}<{{remaining}},'
                   f' {{rate_fmt}}{{postfix}}]{get_color_escape(255, 255, 255)}'}
@@ -46,6 +41,7 @@ def train_fn(
 
     stream = tqdm(train_loader, total=len(train_loader), disable=not accelerator.is_local_main_process, **tqdm_style)
     for i, (images, masks, original_shape) in enumerate(stream):
+        break
         masks = masks.float()
         images = images.float()
         output = model(images)
@@ -65,6 +61,7 @@ def train_fn(
                      **tqdm_style)
 
     for i, (images, masks, original_shape) in enumerate(stream_xz):
+        break
         masks = masks.float()
         images = images.float()
         output = model(images)
@@ -84,6 +81,7 @@ def train_fn(
     stream_yz = tqdm(train_loader_yz, total=len(train_loader_yz), disable=not accelerator.is_local_main_process,
                      **tqdm_style)
     for i, (images, masks, original_shape) in enumerate(stream_yz):
+        break
         masks = masks.float()
         images = images.float()
         output = model(images)
@@ -125,28 +123,32 @@ def validation_fn(
             loss = criterion(output, masks)
             outputs, masks = accelerator.gather((output, masks))
             loss_metric += loss.item() / (i + 1)
+            outputs = accelerator.gather_for_metrics(outputs)
             outputs = outputs.sigmoid().detach().cpu().float().numpy()
             # outputs = outputs[:, 0, :, :] * outputs[:, 1, :, :]
             # dice_batch = dice_valid(outputs, masks[:, 0, :, :])
             stream.set_description(
                 f"Epoch:{epoch + 1}, valid_loss: {loss_metric:.5f}, ")
             for image in outputs:
+                if f"kidney_3_dense_{j:04d}" not in validation_df['id'].values:
+                    j += 1
+                    continue
                 kidney = image[1, :, :]
                 kidney = choose_biggest_object(kidney, 0.5)
-                output_mask = image[0, :, :]
-                output_mask = ((output_mask > 0.15) * kidney)
+                output_mask = image[0, :, :] * kidney
+                output_mask = (output_mask > 0.15).astype(np.uint8)
                 rle_mask = rle_encode(output_mask)
                 pd_dataframe["id"].append(f"kidney_3_dense_{j:04d}")
                 pd_dataframe["rle"].append(rle_mask)
+                j += 1
 
             accelerator.log({f"valid_loss_{fold}": loss_metric})
     # drop all the rows from pd_dataframe which ids are not present in validation_df
     pd_dataframe = pd.DataFrame(pd_dataframe)
-    pd_dataframe = pd_dataframe[pd_dataframe['id'].isin(validation_df['id'])]
-    surface_dice = compute_surface_dice_score(pd_dataframe, validation_df)
+    surface_dice = compute_surface_dice_score(submit=pd_dataframe, label=validation_df)
     accelerator.print(f"Epoch:{epoch + 1}, valid_loss: {loss_metric:.5f} surface_dice: {surface_dice:.5f}")
     accelerator.log({f"surface_dice_{fold}": surface_dice})
-    return np.mean(dice_metric)
+    return surface_dice
 
 
 def oof_fn(model: nn.Module, data_loader: DataLoader, data_loader_xz: DataLoader, data_loader_yz: DataLoader,
