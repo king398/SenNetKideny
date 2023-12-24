@@ -41,62 +41,62 @@ def train_fn(
 
     stream = tqdm(train_loader, total=len(train_loader), disable=not accelerator.is_local_main_process, **tqdm_style)
     for i, (images, masks, original_shape) in enumerate(stream):
-
-        masks = masks.float()
-        images = images.float()
-        output = model(images)
-        loss = criterion(output, masks)
-        accelerator.backward(loss)
-        optimizer.step()
-        optimizer.zero_grad()
-        outputs, masks = accelerator.gather_for_metrics((output, masks))
-        loss_metric += loss.item() / (i + 1)
-        dice_batch = dice(outputs, masks)
-        stream.set_description(
-            f"Epoch:{epoch + 1}, train_loss: {loss_metric:.5f}, dice_batch: {dice_batch.item():.5f}")
-        scheduler.step()
-        accelerator.log({f"train_loss_{fold}": loss_metric, f"train_dice_batch_{fold}": dice_batch.item(),
-                         f"lr_{fold}": optimizer.param_groups[0]['lr']})
+        with accelerator.accumulate(model):
+            masks = masks.float()
+            images = images.float()
+            output = model(images)
+            loss = criterion(output, masks)
+            accelerator.backward(loss)
+            optimizer.step()
+            optimizer.zero_grad()
+            outputs, masks = accelerator.gather_for_metrics((output, masks))
+            loss_metric += loss.item() / (i + 1)
+            dice_batch = dice(outputs, masks)
+            stream.set_description(
+                f"Epoch:{epoch + 1}, train_loss: {loss_metric:.5f}, dice_batch: {dice_batch.item():.5f}")
+            scheduler.step()
+            accelerator.log({f"train_loss_{fold}": loss_metric, f"train_dice_batch_{fold}": dice_batch.item(),
+                             f"lr_{fold}": optimizer.param_groups[0]['lr']})
     stream_xz = tqdm(train_loader_xz, total=len(train_loader_xz), disable=not accelerator.is_local_main_process,
                      **tqdm_style)
 
     for i, (images, masks, original_shape) in enumerate(stream_xz):
-
-        masks = masks.float()
-        images = images.float()
-        output = model(images)
-        loss = criterion(output, masks)
-        accelerator.backward(loss)
-        optimizer.step()
-        optimizer.zero_grad()
-        outputs, masks = accelerator.gather_for_metrics((output, masks))
-        loss_metric += loss.item() / (i + 1)
-        dice_batch = dice(outputs, masks)
-        stream_xz.set_description(
-            f"Epoch:{epoch + 1}, train_loss: {loss_metric:.5f}, dice_batch: {dice_batch.item():.5f}")
-        scheduler.step()
-        accelerator.log({f"train_loss_{fold}": loss_metric, f"train_dice_batch_{fold}": dice_batch.item(),
-                         f"lr_{fold}": optimizer.param_groups[0]['lr']})
+        with accelerator.accumulate(model):
+            masks = masks.float()
+            images = images.float()
+            output = model(images)
+            loss = criterion(output, masks)
+            accelerator.backward(loss)
+            optimizer.step()
+            optimizer.zero_grad()
+            outputs, masks = accelerator.gather_for_metrics((output, masks))
+            loss_metric += loss.item() / (i + 1)
+            dice_batch = dice(outputs, masks)
+            stream_xz.set_description(
+                f"Epoch:{epoch + 1}, train_loss: {loss_metric:.5f}, dice_batch: {dice_batch.item():.5f}")
+            scheduler.step()
+            accelerator.log({f"train_loss_{fold}": loss_metric, f"train_dice_batch_{fold}": dice_batch.item(),
+                             f"lr_{fold}": optimizer.param_groups[0]['lr']})
     torch.cuda.empty_cache()
     stream_yz = tqdm(train_loader_yz, total=len(train_loader_yz), disable=not accelerator.is_local_main_process,
                      **tqdm_style)
     for i, (images, masks, original_shape) in enumerate(stream_yz):
-
-        masks = masks.float()
-        images = images.float()
-        output = model(images)
-        loss = criterion(output, masks)
-        accelerator.backward(loss)
-        optimizer.step()
-        optimizer.zero_grad()
-        outputs, masks = accelerator.gather_for_metrics((output, masks))
-        loss_metric += loss.item() / (i + 1)
-        dice_batch = dice(outputs, masks)
-        stream_yz.set_description(
-            f"Epoch:{epoch + 1}, train_loss: {loss_metric:.5f}, dice_batch: {dice_batch.item():.5f}")
-        scheduler.step()
-        accelerator.log({f"train_loss_{fold}": loss_metric, f"train_dice_batch_{fold}": dice_batch.item(),
-                         f"lr_{fold}": optimizer.param_groups[0]['lr']})
+        with accelerator.accumulate(model):
+            masks = masks.float()
+            images = images.float()
+            output = model(images)
+            loss = criterion(output, masks)
+            accelerator.backward(loss)
+            optimizer.step()
+            optimizer.zero_grad()
+            outputs, masks = accelerator.gather_for_metrics((output, masks))
+            loss_metric += loss.item() / (i + 1)
+            dice_batch = dice(outputs, masks)
+            stream_yz.set_description(
+                f"Epoch:{epoch + 1}, train_loss: {loss_metric:.5f}, dice_batch: {dice_batch.item():.5f}")
+            scheduler.step()
+            accelerator.log({f"train_loss_{fold}": loss_metric, f"train_dice_batch_{fold}": dice_batch.item(),
+                             f"lr_{fold}": optimizer.param_groups[0]['lr']})
 
 
 def validation_fn(
@@ -114,7 +114,9 @@ def validation_fn(
     stream = tqdm(valid_loader, total=len(valid_loader), disable=not accelerator.is_local_main_process, **tqdm_style)
     loss_metric = 0
     pd_dataframe = {"id": [], "rle": []}
+    labels_df = {"id": [], "rle": []}
     j = 0
+    x = 0
     with torch.no_grad():
         for i, (images, masks, original_shape) in enumerate(stream):
             masks = masks.float()
@@ -123,16 +125,12 @@ def validation_fn(
             loss = criterion(output, masks)
             outputs, masks = accelerator.gather((output, masks))
             loss_metric += loss.item() / (i + 1)
-            outputs = accelerator.gather_for_metrics(outputs)
             outputs = outputs.sigmoid().detach().cpu().float().numpy()
             # outputs = outputs[:, 0, :, :] * outputs[:, 1, :, :]
             # dice_batch = dice_valid(outputs, masks[:, 0, :, :])
             stream.set_description(
                 f"Epoch:{epoch + 1}, valid_loss: {loss_metric:.5f}, ")
-            for image in outputs:
-                if f"kidney_3_dense_{j:04d}" not in validation_df['id'].values:
-                    j += 1
-                    continue
+            for p, image in enumerate(outputs):
                 kidney = image[1, :, :]
                 kidney = choose_biggest_object(kidney, 0.5)
                 output_mask = image[0, :, :] * kidney
@@ -140,12 +138,25 @@ def validation_fn(
                 rle_mask = rle_encode(output_mask)
                 pd_dataframe["id"].append(f"kidney_3_dense_{j:04d}")
                 pd_dataframe["rle"].append(rle_mask)
+                # labels_df["id"].append(f"kidney_3_dense_{j:04d}")
+                # labels_df["rle"].append(masks_rle)
                 j += 1
+            for mask in masks[:, 0, :, :]:
+                mask = mask.detach().cpu().numpy()
+                rle_mask = rle_encode(mask)
+                labels_df["id"].append(f"kidney_3_dense_{x:04d}")
+                labels_df["rle"].append(rle_mask)
+                x += 1
 
             accelerator.log({f"valid_loss_{fold}": loss_metric})
     # drop all the rows from pd_dataframe which ids are not present in validation_df
     pd_dataframe = pd.DataFrame(pd_dataframe)
-    surface_dice = compute_surface_dice_score(submit=pd_dataframe, label=validation_df)
+    labels_df = pd.DataFrame(labels_df)
+    labels_df['width'] = 1510
+    labels_df['height'] = 1706
+    labels_df['group'] = 'kidney_3_dense'
+    labels_df['slice'] = np.arange(len(labels_df))
+    surface_dice = compute_surface_dice_score(submit=pd_dataframe, label=labels_df)
     accelerator.print(f"Epoch:{epoch + 1}, valid_loss: {loss_metric:.5f} surface_dice: {surface_dice:.5f}")
     accelerator.log({f"surface_dice_{fold}": surface_dice})
     return surface_dice
