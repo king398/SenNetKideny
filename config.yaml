@@ -1,6 +1,6 @@
 batch_size: 2
 classes: 2
-epochs: 15
+epochs: 25
 in_channels: 3
 kidneys_df: /home/mithil/PycharmProjects/SenNetKideny/data/train_rles_kidneys.csv
 lr: 3e-04

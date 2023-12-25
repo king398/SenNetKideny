@@ -19,6 +19,8 @@ class ReturnModel(nn.Module):
         if not inference:
             self.unet.encoder.model.set_grad_checkpointing(True)
 
+
+
     def forward(self, x):
         # Pad the input
         original_size = x.shape[2:]
@@ -26,9 +28,9 @@ class ReturnModel(nn.Module):
 
         # Forward pass through Unet
         x = self.unet(x)
-
         # Remove padding
         x = self._unpad(x, original_size, pad)
+
         return x
 
     def _pad_image(self, x: torch.Tensor, pad_factor: int = 384):

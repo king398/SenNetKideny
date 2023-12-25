@@ -212,17 +212,17 @@ def main(cfg: dict):
     submission['rle'] = global_rle_list
     # get dir path from model path
     model_dir = os.path.dirname(cfg["model_path"])
-    submission.to_csv(f"{model_dir}/oof_epoch_4.csv", index=False)
+    submission.to_csv(f"{model_dir}/oof_csv.csv", index=False)
     print(submission.head())
 
 
 config = {
     "seed": 42,
-    "model_name": "tu-seresnext101d_32x8d",
+    "model_name": "tu-timm/maxvit_small_tf_384.in1k",
     "in_channels": 3,
     "classes": 2,
     # "test_dir": '/kaggle/input/blood-vessel-segmentation/test',
-    "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/seresnext101d_32x8d_multiview_save_all/model_epoch_4.pth",
+    "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/maxvit_small_tf_384_multiview/model.pth",
     "batch_size": 1,
     "num_workers": 8,
 }

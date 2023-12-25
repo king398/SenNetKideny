@@ -134,7 +134,7 @@ def validation_fn(
                 kidney = image[1, :, :]
                 kidney = choose_biggest_object(kidney, 0.5)
                 output_mask = image[0, :, :] * kidney
-                output_mask = (output_mask > 0.15).astype(np.uint8)
+                output_mask = (output_mask > 0.10).astype(np.uint8)
                 rle_mask = rle_encode(output_mask)
                 pd_dataframe["id"].append(f"kidney_3_dense_{j:04d}")
                 pd_dataframe["rle"].append(rle_mask)

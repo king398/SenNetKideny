@@ -23,7 +23,7 @@ def main(cfg):
     gc.enable()
     accelerate = Accelerator(
         mixed_precision="fp16", log_with=["wandb"],
-        kwargs_handlers=[DistributedDataParallelKwargs(gradient_as_bucket_view=True, find_unused_parameters=False,), ],
+        kwargs_handlers=[DistributedDataParallelKwargs(gradient_as_bucket_view=True, find_unused_parameters=False, ), ],
         project_dir="logs",
         gradient_accumulation_steps=cfg['gradient_accumulation_steps']
     )
@@ -56,12 +56,13 @@ def main(cfg):
                                     train_yz_kidneys_rle)
     train_loader = DataLoader(train_dataset, batch_size=cfg['batch_size'], shuffle=True, num_workers=cfg['num_workers'],
                               pin_memory=True)
-    valid_loader = DataLoader(valid_dataset, batch_size=cfg['batch_size'], shuffle=False,
-                              num_workers=cfg['num_workers'], pin_memory=True)
+
     train_loader_xz = DataLoader(train_dataset_xz, batch_size=cfg['batch_size'], shuffle=True,
                                  num_workers=cfg['num_workers'], pin_memory=True)
     train_loader_yz = DataLoader(train_dataset_yz, batch_size=cfg['batch_size'], shuffle=True,
                                  num_workers=cfg['num_workers'], pin_memory=True)
+    valid_loader = DataLoader(valid_dataset, batch_size=cfg['batch_size'], shuffle=False,
+                              num_workers=cfg['num_workers'], pin_memory=True)
     model = ReturnModel(cfg['model_name'], in_channels=cfg['in_channels'], classes=cfg['classes'])
     optimizer = bnb.optim.AdamW8bit(model.parameters(), lr=float(cfg['lr']))
     scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=int(len(train_loader) * 8),
@@ -78,6 +79,7 @@ def main(cfg):
     validation_df = pd.read_csv(cfg['validation_df'])
     # remove all the rows which do not contain kidney_3_dense in the id column
     validation_df = validation_df[validation_df['id'].str.contains("kidney_3_dense")].reset_index(drop=True)
+
     for epoch in range(cfg['epochs']):
         train_fn(
 
@@ -108,6 +110,9 @@ def main(cfg):
         unwrapped_model = accelerate.unwrap_model(model)
         model_weights = unwrapped_model.state_dict()
         accelerate.save(model_weights, f"{cfg['model_dir']}/model_epoch_{epoch}.pth")
+        if dice_score > best_dice:
+            best_dice = dice_score
+            accelerate.save(model_weights, f"{cfg['model_dir']}/model.pth")
 
     accelerate.end_training()
 
