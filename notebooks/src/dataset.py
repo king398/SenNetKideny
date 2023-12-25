@@ -36,12 +36,13 @@ class ImageDataset(Dataset):
 
 
 class ImageDatasetOOF(Dataset):
-    def __init__(self, image_paths: List[str], transform: Compose, volume: np.array,
-                 mode: Literal["xy", "yz", "xz"] = "xy"):
+    def __init__(self, image_paths: list, transform, volume: np.array,
+                 mode: Literal["xy", "yz", "xz"] = "xy", ):
+
         self.image_paths = image_paths
         self.transform = transform
-        self.volume = volume
         self.mode = mode
+        self.volume = volume
 
     def __len__(self) -> int:
         match self.mode:
@@ -52,25 +53,28 @@ class ImageDatasetOOF(Dataset):
             case "yz":
                 return self.volume.shape[2]
 
-    def __getitem__(self, item) -> tuple[torch.Tensor, tuple[str, ...], str]:
+    def __getitem__(self, item) -> tuple[torch.Tensor, Tuple, str]:
+        match self.mode:
+            case "xy":
+                image = self.volume[item]
+            case "xz":
+                image = self.volume[:, item]
+            case "yz":
+                image = self.volume[:, :, item]
+            case _:
+                raise ValueError("Invalid mode")
+
         if self.mode == "xy":
-            image = self.volume[item]
-        elif self.mode == "xz":
-
-            image = self.volume[:, item]
-        elif self.mode == "yz":
-            image = self.volume[:, :, item]
+            image_id = self.image_paths[item].split("/")[-1].split(".")[0]
+            folder_id = self.image_paths[item].split("/")[-3]
         else:
-            raise ValueError("mode must be either xz or yz")
-
-        image_id = self.image_paths[item].split("/")[-1].split(".")[0]
-        folder_id = self.image_paths[item].split("/")[-3]
+            image_id = "not_applicable"
+            folder_id = "not_applicable"
         image_id = f"{folder_id}_{image_id}"
         image_shape = image.shape
         image_shape = tuple(str(element) for element in image_shape)
 
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
         image = (image - image.min()) / (image.max() - image.min() + 0.0001)
-        augmented = self.transform(image=image)
-        image = augmented["image"]
+        image = self.transform(image=image)
         return image, image_shape, image_id

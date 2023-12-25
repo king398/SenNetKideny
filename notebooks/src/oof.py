@@ -10,9 +10,9 @@ from torch.cuda.amp import autocast
 from tqdm.auto import tqdm
 import glob
 import pandas as pd
-from typing import Literal
 from utils import *
 from model import ReturnModel
+from dataset import ImageDatasetOOF
 
 
 def get_valid_transform(image: np.array, ) -> np.array:
@@ -27,51 +27,6 @@ def get_valid_transform(image: np.array, ) -> np.array:
 
     # Apply the transformation
     return transform(image=image)['image']
-
-
-class ImageDataset(Dataset):
-    def __init__(self, image_paths: list, transform, volume: np.array,
-                 mode: Literal["xy", "yz", "xz"] = "xy", ):
-
-        self.image_paths = image_paths
-        self.transform = transform
-        self.mode = mode
-        self.volume = volume
-
-    def __len__(self) -> int:
-        match self.mode:
-            case "xy":
-                return self.volume.shape[0]
-            case "xz":
-                return self.volume.shape[1]
-            case "yz":
-                return self.volume.shape[2]
-
-    def __getitem__(self, item) -> tuple[torch.Tensor, Tuple, str]:
-        match self.mode:
-            case "xy":
-                image = self.volume[item]
-            case "xz":
-                image = self.volume[:, item]
-            case "yz":
-                image = self.volume[:, :, item]
-            case _:
-                raise ValueError("Invalid mode")
-
-        if self.mode == "xy":
-            image_id = self.image_paths[item].split("/")[-1].split(".")[0]
-            folder_id = self.image_paths[item].split("/")[-3]
-        else:
-            image_id = "not_applicable"
-            folder_id = "not_applicable"
-        image_id = f"{folder_id}_{image_id}"
-        image_shape = image.shape
-        image_shape = tuple(str(element) for element in image_shape)
-
-        image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
-        image = (image - image.min()) / (image.max() - image.min() + 0.0001)
-        image = self.transform(image=image)
-        return image, image_shape, image_id
 
 
 def inference_loop(model: nn.Module, images: torch.Tensor) -> torch.Tensor:
@@ -162,7 +117,7 @@ def inference_fn(model: nn.Module, data_loader: DataLoader, data_loader_xz: Data
 
     gc.collect()
     volume = volume / 3
-    volume = apply_hysteresis_thresholding(volume, 0.2, 0.6)
+    volume = apply_hysteresis_thresholding(volume, 0.2, 0.5)
     volume = (volume * 255).astype(np.uint8)
     for output_mask in volume:
         rles_list.append(rle_encode(output_mask))
@@ -172,6 +127,7 @@ def inference_fn(model: nn.Module, data_loader: DataLoader, data_loader_xz: Data
 
 
 def main(cfg: dict):
+    global volume_uncompressed
     seed_everything(cfg['seed'])
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     test_dirs = ["/home/mithil/PycharmProjects/SenNetKideny/data/train/kidney_3_sparse", ]
@@ -191,20 +147,21 @@ def main(cfg: dict):
             if image_id in valid_rle['id'].values:
                 test_files.append(i)
         volume = np.stack([cv2.imread(i, cv2.IMREAD_GRAYSCALE) for i in test_files])
-        test_dataset_xy = ImageDataset(test_files, get_valid_transform, mode='xy', volume=volume)
-        test_dataset_xz = ImageDataset(test_files, get_valid_transform, mode='xz',
-                                       volume=volume)
-        test_dataset_yz = ImageDataset(test_files, get_valid_transform, mode='yz',
-                                       volume=volume)
+        test_dataset_xy = ImageDatasetOOF(test_files, get_valid_transform, mode='xy', volume=volume)
+        test_dataset_xz = ImageDatasetOOF(test_files, get_valid_transform, mode='xz',
+                                          volume=volume)
+        test_dataset_yz = ImageDatasetOOF(test_files, get_valid_transform, mode='yz',
+                                          volume=volume)
         test_loader = DataLoader(test_dataset_xy, batch_size=cfg['batch_size'], shuffle=False,
                                  num_workers=cfg['num_workers'], pin_memory=True)
         test_loader_xz = DataLoader(test_dataset_xz, batch_size=cfg['batch_size'] * 2, shuffle=False,
                                     num_workers=cfg['num_workers'], pin_memory=True)
         test_loader_yz = DataLoader(test_dataset_yz, batch_size=cfg['batch_size'] * 2, shuffle=False,
                                     num_workers=cfg['num_workers'], pin_memory=True)
-        rles_list, image_ids = inference_fn(model=model, data_loader=test_loader, data_loader_xz=test_loader_xz,
-                                            data_loader_yz=test_loader_yz,
-                                            device=device, volume_shape=volume.shape[:3])
+        rles_list, image_ids = inference_fn(model=model, data_loader=test_loader,
+                                                                 data_loader_xz=test_loader_xz,
+                                                                 data_loader_yz=test_loader_yz,
+                                                                 device=device, volume_shape=volume.shape[:3])
         global_rle_list.extend(rles_list)
         global_image_ids.extend(image_ids)
         del volume, test_dataset_xy, test_dataset_xz, test_dataset_yz, test_loader, test_loader_xz, test_loader_yz
@@ -219,12 +176,12 @@ def main(cfg: dict):
 
 config = {
     "seed": 42,
-    "model_name": "tu-timm/maxvit_small_tf_384.in1k",
+    "model_name": "mit_b5",
     "in_channels": 3,
     "classes": 2,
     # "test_dir": '/kaggle/input/blood-vessel-segmentation/test',
-    "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/maxvit_small_tf_384_multiview/model.pth",
-    "batch_size": 1,
+    "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/mit_b5_multiview/model.pth",
+    "batch_size": 4,
     "num_workers": 8,
 }
 if __name__ == "__main__":

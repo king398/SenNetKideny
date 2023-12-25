@@ -41,7 +41,7 @@ def train_fn(
 
     stream = tqdm(train_loader, total=len(train_loader), disable=not accelerator.is_local_main_process, **tqdm_style)
     for i, (images, masks, original_shape) in enumerate(stream):
-        with accelerator.accumulate(model):
+        with accelerator.accumulate([model]):
             masks = masks.float()
             images = images.float()
             output = model(images)
@@ -54,14 +54,14 @@ def train_fn(
             dice_batch = dice(outputs, masks)
             stream.set_description(
                 f"Epoch:{epoch + 1}, train_loss: {loss_metric:.5f}, dice_batch: {dice_batch.item():.5f}")
-            scheduler.step()
+            #scheduler.step()
             accelerator.log({f"train_loss_{fold}": loss_metric, f"train_dice_batch_{fold}": dice_batch.item(),
                              f"lr_{fold}": optimizer.param_groups[0]['lr']})
     stream_xz = tqdm(train_loader_xz, total=len(train_loader_xz), disable=not accelerator.is_local_main_process,
                      **tqdm_style)
 
     for i, (images, masks, original_shape) in enumerate(stream_xz):
-        with accelerator.accumulate(model):
+        with accelerator.accumulate([model]):
             masks = masks.float()
             images = images.float()
             output = model(images)
@@ -74,14 +74,14 @@ def train_fn(
             dice_batch = dice(outputs, masks)
             stream_xz.set_description(
                 f"Epoch:{epoch + 1}, train_loss: {loss_metric:.5f}, dice_batch: {dice_batch.item():.5f}")
-            scheduler.step()
+            #scheduler.step()
             accelerator.log({f"train_loss_{fold}": loss_metric, f"train_dice_batch_{fold}": dice_batch.item(),
                              f"lr_{fold}": optimizer.param_groups[0]['lr']})
     torch.cuda.empty_cache()
     stream_yz = tqdm(train_loader_yz, total=len(train_loader_yz), disable=not accelerator.is_local_main_process,
                      **tqdm_style)
     for i, (images, masks, original_shape) in enumerate(stream_yz):
-        with accelerator.accumulate(model):
+        with accelerator.accumulate([model]):
             masks = masks.float()
             images = images.float()
             output = model(images)
@@ -94,7 +94,7 @@ def train_fn(
             dice_batch = dice(outputs, masks)
             stream_yz.set_description(
                 f"Epoch:{epoch + 1}, train_loss: {loss_metric:.5f}, dice_batch: {dice_batch.item():.5f}")
-            scheduler.step()
+            #scheduler.step()
             accelerator.log({f"train_loss_{fold}": loss_metric, f"train_dice_batch_{fold}": dice_batch.item(),
                              f"lr_{fold}": optimizer.param_groups[0]['lr']})
 

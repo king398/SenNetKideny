@@ -4,6 +4,7 @@ import segmentation_models_pytorch as smp
 import torch
 import torch.nn as nn
 import segmentation_models_pytorch as smp
+from torch.utils.checkpoint import checkpoint
 
 
 class ReturnModel(nn.Module):
@@ -16,10 +17,9 @@ class ReturnModel(nn.Module):
             in_channels=in_channels,
             classes=classes,
         )
-        if not inference:
-            self.unet.encoder.model.set_grad_checkpointing(True)
-
-
+        # if not inference:
+        #    self.unet.encoder.model.set_grad_checkpointing(True)
+        self.inference = inference
 
     def forward(self, x):
         # Pad the input
@@ -27,13 +27,15 @@ class ReturnModel(nn.Module):
         x, pad = self._pad_image(x)
 
         # Forward pass through Unet
-        x = self.unet(x)
+        x = checkpoint(self.unet.encoder, x)
+        x = self.unet.decoder(*x)
+        x = self.unet.segmentation_head(x)
         # Remove padding
         x = self._unpad(x, original_size, pad)
 
         return x
 
-    def _pad_image(self, x: torch.Tensor, pad_factor: int = 256):
+    def _pad_image(self, x: torch.Tensor, pad_factor: int = 32):
         h, w = x.shape[2], x.shape[3]
         h_pad = (pad_factor - h % pad_factor) % pad_factor
         w_pad = (pad_factor - w % pad_factor) % pad_factor

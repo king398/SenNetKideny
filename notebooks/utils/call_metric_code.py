@@ -9,7 +9,7 @@ solution_df['height'] = 1706
 solution_df['group'] = 'kidney_3_dense'
 solution_df['slice'] = np.arange(len(solution_df))
 
-model_dir = "maxvit_small_tf_384_multiview"
+model_dir = "mit_b5_multiview"
 submission_df = pd.read_csv(f"/home/mithil/PycharmProjects/SenNetKideny/models/{model_dir}/oof_csv.csv")
 # replace sparse with dense
 submission_df['id'] = submission_df['id'].apply(lambda x: x.replace('sparse', 'dense'))

@@ -19,7 +19,7 @@ import pandas as pd
 from albumentations import CenterCrop
 from typing import Literal
 from skimage import filters
-
+from torch.utils.checkpoint import  checkpoint
 
 def apply_hysteresis_thresholding(volume: np.array, low: float, high: float, chunk_size: int = 32):
     """
@@ -144,21 +144,22 @@ class ImageDataset(Dataset):
 
 
 class ReturnModel(nn.Module):
-    def __init__(self, model_name: str, in_channels: int, classes: int, pad_factor: int = 384, inference: bool = False):
+    def __init__(self, model_name: str, in_channels: int, classes: int, inference: bool = False):
         super(ReturnModel, self).__init__()
         # Initialize the Unet model
         if inference:
-            encoder_weights = None
+           encoder_weights = None
         else:
-            encoder_weights = "imagenet"
+           encoder_weights = "imagenet"
         self.unet = smp.Unet(
             encoder_name=model_name,
             encoder_weights=encoder_weights,
             in_channels=in_channels,
             classes=classes,
         )
-        self.unet.encoder.model.set_grad_checkpointing(True)
-        self.pad_factor = pad_factor
+        # if not inference:
+        #    self.unet.encoder.model.set_grad_checkpointing(True)
+        self.inference = inference
 
     def forward(self, x):
         # Pad the input
@@ -166,16 +167,18 @@ class ReturnModel(nn.Module):
         x, pad = self._pad_image(x)
 
         # Forward pass through Unet
-        x = self.unet(x)
+        x = checkpoint(self.unet.encoder, x)
+        x = self.unet.decoder(*x)
+        x = self.unet.segmentation_head(x)
         # Remove padding
         x = self._unpad(x, original_size, pad)
 
         return x
 
-    def _pad_image(self, x: torch.Tensor):
+    def _pad_image(self, x: torch.Tensor, pad_factor: int = 32):
         h, w = x.shape[2], x.shape[3]
-        h_pad = (self.pad_factor - h % self.pad_factor) % self.pad_factor
-        w_pad = (self.pad_factor - w % self.pad_factor) % self.pad_factor
+        h_pad = (pad_factor - h % pad_factor) % pad_factor
+        w_pad = (pad_factor - w % pad_factor) % pad_factor
 
         # Calculate padding
         pad = [w_pad // 2, w_pad - w_pad // 2, h_pad // 2, h_pad - h_pad // 2]
@@ -342,11 +345,11 @@ def main(cfg: dict):
 
 config = {
     "seed": 42,
-    "model_name": "tu-timm/maxvit_small_tf_384.in1k",
+    "model_name": "mit_b5",
     "in_channels": 3,
     "classes": 2,
     "test_dir": '/kaggle/input/blood-vessel-segmentation/test',
-    "model_path": "/kaggle/input/senet-models/maxvit_small_tf_384_multiview/model.pth",
+    "model_path": "/kaggle/input/senet-models/mit_b5_multiview/model.pth",
     "batch_size": 4,
     "num_workers": 4,
     "threshold": 0.15,
