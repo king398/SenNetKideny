@@ -34,6 +34,7 @@ def main(cfg):
     validation_images = os.listdir(f"{cfg['validation_dir']}/images/")
     train_images_xz = os.listdir(f"{cfg['train_dir']}_xz/images/")
     train_images_yz = os.listdir(f"{cfg['train_dir']}_yz/images/")
+    train_images_kidney_3 = os.listdir(f"{cfg['train_dir_2']}/images/")
     train_kidneys_rle = list(map(lambda x: kidney_rle[f"kidney_1_dense_{x.split('.')[0]}"], train_images))
     train_images = list(map(lambda x: f"{cfg['train_dir']}/images/{x}", train_images))
     train_masks = list(map(lambda x: x.replace("images", "labels"), train_images))

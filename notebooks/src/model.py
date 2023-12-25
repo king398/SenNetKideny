@@ -33,7 +33,7 @@ class ReturnModel(nn.Module):
 
         return x
 
-    def _pad_image(self, x: torch.Tensor, pad_factor: int = 384):
+    def _pad_image(self, x: torch.Tensor, pad_factor: int = 256):
         h, w = x.shape[2], x.shape[3]
         h_pad = (pad_factor - h % pad_factor) % pad_factor
         w_pad = (pad_factor - w % pad_factor) % pad_factor

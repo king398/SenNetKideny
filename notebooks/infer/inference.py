@@ -69,21 +69,16 @@ def rle_encode(mask: np.array) -> str:
     return rle
 
 
-def get_valid_transform(image: np.array, original_height: int, original_width: int) -> np.array:
+def get_valid_transform(image: np.array) -> np.array:
     """
     Crops the padded image back to its original dimensions.
 
     :param image: Padded image.
-    :param original_height: Original height of the image before padding.
-    :param original_width: Original width of the image before padding.
     :return: Cropped image with original dimensions.
     """
     # Define the cropping transformation
     # round up original height and width to nearest 32
-    original_height = int(np.ceil(original_height / 32) * 32)
-    original_width = int(np.ceil(original_width / 32) * 32)
     transform = Compose([
-        PadIfNeeded(min_height=original_height, min_width=original_width),
         ToTensorV2(),
     ])
 
@@ -144,19 +139,52 @@ class ImageDataset(Dataset):
 
         image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
         image = (image - image.min()) / (image.max() - image.min() + 0.0001)
-        image = self.transform(image=image, original_height=int(image_shape[0]), original_width=int(image_shape[1]))
+        image = self.transform(image=image)
         return image, image_shape, image_id
 
 
-def return_model(model_name: str, in_channels: int, classes: int) -> nn.Module:
-    model = smp.Unet(
-        encoder_name=model_name,
-        encoder_weights=None,
-        in_channels=in_channels,
-        classes=classes,
+class ReturnModel(nn.Module):
+    def __init__(self, model_name: str, in_channels: int, classes: int, pad_factor: int = 384, inference: bool = False):
+        super(ReturnModel, self).__init__()
+        # Initialize the Unet model
+        if inference:
+            encoder_weights = None
+        else:
+            encoder_weights = "imagenet"
+        self.unet = smp.Unet(
+            encoder_name=model_name,
+            encoder_weights=encoder_weights,
+            in_channels=in_channels,
+            classes=classes,
+        )
+        self.unet.encoder.model.set_grad_checkpointing(True)
+        self.pad_factor = pad_factor
 
-    )
-    return model
+    def forward(self, x):
+        # Pad the input
+        original_size = x.shape[2:]
+        x, pad = self._pad_image(x)
+
+        # Forward pass through Unet
+        x = self.unet(x)
+        # Remove padding
+        x = self._unpad(x, original_size, pad)
+
+        return x
+
+    def _pad_image(self, x: torch.Tensor):
+        h, w = x.shape[2], x.shape[3]
+        h_pad = (self.pad_factor - h % self.pad_factor) % self.pad_factor
+        w_pad = (self.pad_factor - w % self.pad_factor) % self.pad_factor
+
+        # Calculate padding
+        pad = [w_pad // 2, w_pad - w_pad // 2, h_pad // 2, h_pad - h_pad // 2]
+        x = nn.functional.pad(x, pad, mode='constant', value=0)
+        return x, pad
+
+    def _unpad(self, x, original_size, pad):
+        h, w = original_size
+        return x[:, :, pad[2]:h + pad[2], pad[0]:w + pad[0]]
 
 
 def reverse_padding(image: np.array, original_height: int, original_width: int):
@@ -224,9 +252,6 @@ def inference_fn(model: nn.Module, data_loader: DataLoader, data_loader_xz: Data
             output_mask = image[0, :, :]
             output_mask = output_mask.numpy() * kidney
 
-            output_mask = reverse_padding(output_mask,
-                                          original_height=int(image_shapes[0][j]),
-                                          original_width=int(image_shapes[1][j]))
             image_ids_all.append(image_ids[j])
             volume[global_counter] += output_mask
             global_counter += 1
@@ -243,9 +268,6 @@ def inference_fn(model: nn.Module, data_loader: DataLoader, data_loader_xz: Data
             kidney = choose_biggest_object(kidney.numpy(), 0.5)
             output_mask = image[0, :, :]
             output_mask = (output_mask.numpy() * kidney)
-            output_mask = reverse_padding(output_mask,
-                                          original_height=int(image_shapes[0][j]),
-                                          original_width=int(image_shapes[1][j]))
 
             volume[:, global_counter] += output_mask
             global_counter += 1
@@ -262,9 +284,6 @@ def inference_fn(model: nn.Module, data_loader: DataLoader, data_loader_xz: Data
             kidney = choose_biggest_object(kidney.numpy(), 0.5)
             output_mask = image[0, :, :] * kidney
             output_mask = (output_mask.numpy() * kidney)
-            output_mask = reverse_padding(output_mask,
-                                          original_height=int(image_shapes[0][j]),
-                                          original_width=int(image_shapes[1][j]))
 
             volume[:, :, global_counter] += output_mask
             global_counter += 1
@@ -274,7 +293,7 @@ def inference_fn(model: nn.Module, data_loader: DataLoader, data_loader_xz: Data
     gc.collect()
     volume = volume / 3
     volume = apply_hysteresis_thresholding(volume, 0.2, 0.6)
-    volume = (volume  * 255).astype(np.uint8)
+    volume = (volume * 255).astype(np.uint8)
     for output_mask in volume:
         rles_list.append(rle_encode(output_mask))
     del volume
@@ -286,10 +305,11 @@ def main(cfg: dict):
     seed_everything(cfg['seed'])
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     test_dirs = sorted(glob.glob(f"{cfg['test_dir']}/*"))
-    model = return_model(cfg['model_name'], cfg['in_channels'], cfg['classes'])
-    # model = nn.DataParallel(model)
+    model = ReturnModel(cfg['model_name'], cfg['in_channels'], cfg['classes'], inference=True)
     model.to(device)
     model.load_state_dict(torch.load(cfg["model_path"], map_location=torch.device('cuda')))
+    model = nn.DataParallel(model)
+
     global_rle_list = []
     global_image_ids = []
 
@@ -322,13 +342,13 @@ def main(cfg: dict):
 
 config = {
     "seed": 42,
-    "model_name": "tu-seresnext101d_32x8d",
+    "model_name": "tu-timm/maxvit_small_tf_384.in1k",
     "in_channels": 3,
     "classes": 2,
     "test_dir": '/kaggle/input/blood-vessel-segmentation/test',
-    "model_path": "/kaggle/input/senet-models/seresnext101d_32x8d_pad_kidney_multiview/model.pth",
-    "batch_size": 2,
-    "num_workers": 2,
+    "model_path": "/kaggle/input/senet-models/maxvit_small_tf_384_multiview/model.pth",
+    "batch_size": 4,
+    "num_workers": 4,
     "threshold": 0.15,
 }
 if __name__ == "__main__":

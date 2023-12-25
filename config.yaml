@@ -10,7 +10,7 @@ model_name: tu-timm/maxvit_small_tf_384.in1k
 num_workers: 8
 seed: 42
 train_dir: /home/mithil/PycharmProjects/SenNetKideny/data/train/kidney_1_dense
-train_dir_2: /home/mithil/PycharmProjects/SenNetKideny/data/train/kidney_2
+train_dir_2: /home/mithil/PycharmProjects/SenNetKideny/data/train/kidney_3_dense
 validation_dir: /home/mithil/PycharmProjects/SenNetKideny/data/train/kidney_3_sparse
 validation_df: /home/mithil/PycharmProjects/SenNetKideny/data/kidney_3_dense_full.csv
 gradient_accumulation_steps: 2
