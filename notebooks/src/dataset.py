@@ -1,4 +1,3 @@
-import numpy as np
 
 from utils import *
 from torch.utils.data import Dataset
@@ -78,3 +77,29 @@ class ImageDatasetOOF(Dataset):
         image = (image - image.min()) / (image.max() - image.min() + 0.0001)
         image = self.transform(image=image)
         return image, image_shape, image_id
+class CombinedDataLoader:
+    def __init__(self, *dataloaders):
+        self.dataloaders = dataloaders
+
+    def __iter__(self):
+        self.iterators = [iter(dataloader) for dataloader in self.dataloaders]
+        return self
+
+    def __next__(self):
+        # Randomly pick a dataloader
+        dataloader = random.choice(self.iterators)
+
+        # Try to fetch the next batch from this dataloader
+        try:
+            batch = next(dataloader)
+        except StopIteration:
+            # If this dataloader is exhausted, remove it from the list
+            self.iterators.remove(dataloader)
+            if not self.iterators:
+                raise StopIteration
+            return self.__next__()
+
+        return batch
+
+    def __len__(self):
+        return sum(len(dataloader) for dataloader in self.dataloaders)
