@@ -31,7 +31,7 @@ class ImageDataset(Dataset):
         image = augmented["image"]
         mask = augmented["mask"]
 
-        return image, mask, original_shape
+        return image, mask
 
 
 class ImageDatasetOOF(Dataset):

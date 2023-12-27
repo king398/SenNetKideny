@@ -23,7 +23,7 @@ def main(cfg):
     gc.enable()
     accelerate = Accelerator(
         mixed_precision="fp16", log_with=["wandb"],
-        kwargs_handlers=[DistributedDataParallelKwargs(gradient_as_bucket_view=True, find_unused_parameters=True), ],
+        kwargs_handlers=[DistributedDataParallelKwargs(gradient_as_bucket_view=True, find_unused_parameters=False), ],
         project_dir="logs"
     )
     accelerate.init_trackers(project_name="SenNetKidney", config=cfg)
@@ -63,8 +63,7 @@ def main(cfg):
                                  num_workers=cfg['num_workers'], pin_memory=True)
     model = ReturnModel(cfg['model_name'], in_channels=cfg['in_channels'], classes=cfg['classes'])
     optimizer = bnb.optim.AdamW8bit(model.parameters(), lr=float(cfg['lr']))
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=int(
-        (len(train_loader) + len(train_loader_yz) + len(train_loader_xz)) * 10),
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=int(len(train_loader) * 5),
                                                                      eta_min=float(cfg['min_lr']))
     train_loader, valid_loader, model, optimizer, scheduler, train_loader_yz, train_loader_xz = accelerate.prepare(
         train_loader,

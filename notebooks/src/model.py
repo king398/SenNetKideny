@@ -20,14 +20,16 @@ class ReturnModel(nn.Module):
         # if not inference:
         #    self.unet.encoder.model.set_grad_checkpointing(True)
         self.inference = inference
+        self.unet.encoder.model.set_grad_checkpointing(True)
 
-    def forward(self, x):
+    def forward(self, x, inference: bool = False):
         # Pad the input
         original_size = x.shape[2:]
         x, pad = self._pad_image(x)
 
         # Forward pass through Unet
-        x = checkpoint(self.unet.encoder, x)
+        x = self.unet.encoder(x)
+
         x = self.unet.decoder(*x)
         x = self.unet.segmentation_head(x)
         # Remove padding
