@@ -176,11 +176,11 @@ def main(cfg: dict):
 
 config = {
     "seed": 42,
-    "model_name": "mit_b5",
+    "model_name": "tu-seresnext101d_32x8d",
     "in_channels": 3,
     "classes": 2,
     # "test_dir": '/kaggle/input/blood-vessel-segmentation/test',
-    "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/mit_b5_multiview/model.pth",
+    "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/seresnext101d_32x8d_pad_kidney_multiview/model.pth",
     "batch_size": 4,
     "num_workers": 8,
 }

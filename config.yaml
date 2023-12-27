@@ -1,16 +1,17 @@
-batch_size: 8
+batch_size: 4
 classes: 2
-epochs: 25
+epochs: 15
+image_size: 1536
 in_channels: 3
 kidneys_df: /home/mithil/PycharmProjects/SenNetKideny/data/train_rles_kidneys.csv
-lr: 5e-04
-min_lr: 3e-06
-model_dir: /home/mithil/PycharmProjects/SenNetKideny/models/seresnext101d_multiview_25_epoch
-model_name: tu-timm/seresnext101d_32x8d.ah_in1k
-num_workers: 8
+lr: 5e-4
+min_lr: 3e-05
+model_dir: /home/mithil/PycharmProjects/SenNetKideny/models/seresnext101d_32x8d_pad_kidney_multiview_hflip
+model_name: tu-seresnext101d_32x8d
+num_workers: 4
 seed: 42
 train_dir: /home/mithil/PycharmProjects/SenNetKideny/data/train/kidney_1_dense
-train_dir_2: /home/mithil/PycharmProjects/SenNetKideny/data/train/kidney_3_dense
+train_dir_2: /home/mithil/PycharmProjects/SenNetKideny/data/train/kidney_2
 validation_dir: /home/mithil/PycharmProjects/SenNetKideny/data/train/kidney_3_sparse
-validation_df: /home/mithil/PycharmProjects/SenNetKideny/data/kidney_3_dense_full.csv
+
 gradient_accumulation_steps: 1

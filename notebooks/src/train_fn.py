@@ -8,7 +8,7 @@ from accelerate import Accelerator
 import pandas as pd
 from metric import compute_surface_dice_score
 from dataset import CombinedDataLoader
-
+dice = Dice()
 
 tqdm_color = get_color_escape(0, 229, 255)  # Red color for example
 tqdm_style = {
@@ -49,47 +49,7 @@ def train_fn(
             dice_batch = dice(outputs, masks)
             stream.set_description(
                 f"Epoch:{epoch + 1}, train_loss: {loss_metric:.5f}, dice_batch: {dice_batch.item():.5f}")
-            # scheduler.step()
-            accelerator.log({f"train_loss_{fold}": loss_metric, f"train_dice_batch_{fold}": dice_batch.item(),
-                             f"lr_{fold}": optimizer.param_groups[0]['lr']})
-    stream_xz = tqdm(train_loader_xz, total=len(train_loader_xz), disable=not accelerator.is_local_main_process,
-                     **tqdm_style)
-
-    for i, (images, masks, original_shape) in enumerate(stream_xz):
-        with accelerator.accumulate([model]):
-            masks = masks.float()
-            images = images.float()
-            output = model(images)
-            loss = criterion(output, masks)
-            accelerator.backward(loss)
-            optimizer.step()
-            optimizer.zero_grad()
-            outputs, masks = accelerator.gather_for_metrics((output, masks))
-            loss_metric += loss.item() / (i + 1)
-            dice_batch = dice(outputs, masks)
-            stream_xz.set_description(
-                f"Epoch:{epoch + 1}, train_loss: {loss_metric:.5f}, dice_batch: {dice_batch.item():.5f}")
-            # scheduler.step()
-            accelerator.log({f"train_loss_{fold}": loss_metric, f"train_dice_batch_{fold}": dice_batch.item(),
-                             f"lr_{fold}": optimizer.param_groups[0]['lr']})
-    torch.cuda.empty_cache()
-    stream_yz = tqdm(train_loader_yz, total=len(train_loader_yz), disable=not accelerator.is_local_main_process,
-                     **tqdm_style)
-    for i, (images, masks, original_shape) in enumerate(stream_yz):
-        with accelerator.accumulate([model]):
-            masks = masks.float()
-            images = images.float()
-            output = model(images)
-            loss = criterion(output, masks)
-            accelerator.backward(loss)
-            optimizer.step()
-            optimizer.zero_grad()
-            outputs, masks = accelerator.gather_for_metrics((output, masks))
-            loss_metric += loss.item() / (i + 1)
-            dice_batch = dice(outputs, masks)
-            stream_yz.set_description(
-                f"Epoch:{epoch + 1}, train_loss: {loss_metric:.5f}, dice_batch: {dice_batch.item():.5f}")
-            # scheduler.step()
+            scheduler.step()
             accelerator.log({f"train_loss_{fold}": loss_metric, f"train_dice_batch_{fold}": dice_batch.item(),
                              f"lr_{fold}": optimizer.param_groups[0]['lr']})
 
@@ -101,7 +61,6 @@ def validation_fn(
         epoch: int,
         accelerator: Accelerator,
         fold: int,
-        validation_df: pd.DataFrame
 ):
     gc.collect()
     torch.cuda.empty_cache()

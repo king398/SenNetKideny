@@ -23,9 +23,8 @@ def main(cfg):
     gc.enable()
     accelerate = Accelerator(
         mixed_precision="fp16", log_with=["wandb"],
-        kwargs_handlers=[DistributedDataParallelKwargs(gradient_as_bucket_view=True, find_unused_parameters=True, ), ],
-        project_dir="logs",
-        gradient_accumulation_steps=cfg['gradient_accumulation_steps']
+        kwargs_handlers=[DistributedDataParallelKwargs(gradient_as_bucket_view=True, find_unused_parameters=True), ],
+        project_dir="logs"
     )
     accelerate.init_trackers(project_name="SenNetKidney", config=cfg)
     kidneys_df = pd.read_csv(cfg['kidneys_df'])
@@ -34,7 +33,6 @@ def main(cfg):
     validation_images = os.listdir(f"{cfg['validation_dir']}/images/")
     train_images_xz = os.listdir(f"{cfg['train_dir']}_xz/images/")
     train_images_yz = os.listdir(f"{cfg['train_dir']}_yz/images/")
-    train_images_kidney_3 = os.listdir(f"{cfg['train_dir_2']}/images/")
     train_kidneys_rle = list(map(lambda x: kidney_rle[f"kidney_1_dense_{x.split('.')[0]}"], train_images))
     train_images = list(map(lambda x: f"{cfg['train_dir']}/images/{x}", train_images))
     train_masks = list(map(lambda x: x.replace("images", "labels"), train_images))
@@ -57,16 +55,16 @@ def main(cfg):
                                     train_yz_kidneys_rle)
     train_loader = DataLoader(train_dataset, batch_size=cfg['batch_size'], shuffle=True, num_workers=cfg['num_workers'],
                               pin_memory=True)
-
+    valid_loader = DataLoader(valid_dataset, batch_size=cfg['batch_size'], shuffle=False,
+                              num_workers=cfg['num_workers'], pin_memory=True)
     train_loader_xz = DataLoader(train_dataset_xz, batch_size=cfg['batch_size'], shuffle=True,
                                  num_workers=cfg['num_workers'], pin_memory=True)
     train_loader_yz = DataLoader(train_dataset_yz, batch_size=cfg['batch_size'], shuffle=True,
                                  num_workers=cfg['num_workers'], pin_memory=True)
-    valid_loader = DataLoader(valid_dataset, batch_size=cfg['batch_size'], shuffle=False,
-                              num_workers=cfg['num_workers'], pin_memory=True)
     model = ReturnModel(cfg['model_name'], in_channels=cfg['in_channels'], classes=cfg['classes'])
     optimizer = bnb.optim.AdamW8bit(model.parameters(), lr=float(cfg['lr']))
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=int(len(train_loader) * 8),
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=int(
+        (len(train_loader) + len(train_loader_yz) + len(train_loader_xz)) * 10),
                                                                      eta_min=float(cfg['min_lr']))
     train_loader, valid_loader, model, optimizer, scheduler, train_loader_yz, train_loader_xz = accelerate.prepare(
         train_loader,
@@ -77,10 +75,6 @@ def main(cfg):
 
     criterion = SoftBCEWithLogitsLoss()
     best_dice = -1
-    validation_df = pd.read_csv(cfg['validation_df'])
-    # remove all the rows which do not contain kidney_3_dense in the id column
-    validation_df = validation_df[validation_df['id'].str.contains("kidney_3_dense")].reset_index(drop=True)
-
     for epoch in range(cfg['epochs']):
         train_fn(
 
@@ -104,16 +98,14 @@ def main(cfg):
             epoch=epoch,
             fold=0,
             accelerator=accelerate,
-            validation_df=validation_df
 
         )
         accelerate.wait_for_everyone()
+        if dice_score > best_dice:
+            best_dice = best_dice
         unwrapped_model = accelerate.unwrap_model(model)
         model_weights = unwrapped_model.state_dict()
-        accelerate.save(model_weights, f"{cfg['model_dir']}/model_epoch_{epoch}.pth")
-        if dice_score > best_dice:
-            best_dice = dice_score
-            accelerate.save(model_weights, f"{cfg['model_dir']}/model.pth")
+        accelerate.save(model_weights, f"{cfg['model_dir']}/model.pth")
 
     accelerate.end_training()
 
