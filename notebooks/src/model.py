@@ -4,7 +4,7 @@ import segmentation_models_pytorch as smp
 import torch
 import torch.nn as nn
 import segmentation_models_pytorch as smp
-from torch.utils.checkpoint import checkpoint
+from torch.utils.checkpoint import checkpoint, checkpoint_sequential
 
 
 class ReturnModel(nn.Module):
@@ -20,7 +20,6 @@ class ReturnModel(nn.Module):
         # if not inference:
         #    self.unet.encoder.model.set_grad_checkpointing(True)
         self.inference = inference
-        self.unet.encoder.model.set_grad_checkpointing(True)
 
     def forward(self, x, inference: bool = False):
         # Pad the input
@@ -28,7 +27,10 @@ class ReturnModel(nn.Module):
         x, pad = self._pad_image(x)
 
         # Forward pass through Unet
-        x = self.unet.encoder(x)
+        if inference:
+            x = self.unet.encoder(x)
+        else:
+            x = checkpoint(self.unet.encoder, x,use_reentrant=False)
 
         x = self.unet.decoder(*x)
         x = self.unet.segmentation_head(x)

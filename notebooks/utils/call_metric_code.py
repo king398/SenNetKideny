@@ -9,8 +9,9 @@ solution_df['height'] = 1706
 solution_df['group'] = 'kidney_3_dense'
 solution_df['slice'] = np.arange(len(solution_df))
 
-model_dir = "seresnext101d_32x8d_pad_kidney_multiview"
-submission_df = pd.read_csv(f"/home/mithil/PycharmProjects/SenNetKideny/models/{model_dir}/oof_csv.csv")
+model_dir = "seresnext101d_32x8d_pad_kidney_multiview_check_retrain_no_flip"
+#submission_df = pd.read_csv(f"/home/mithil/PycharmProjects/SenNetKideny/models/{model_dir}/oof_csv.csv")
+submission_df = pd.read_csv(f"/home/mithil/PycharmProjects/SenNetKideny/oof.csv")
 # replace sparse with dense
 submission_df['id'] = submission_df['id'].apply(lambda x: x.replace('sparse', 'dense'))
 # only keep the id with are present in solution

@@ -5,7 +5,7 @@ from albumentations.pytorch import ToTensorV2
 def get_train_transform(height: int = 1344, width: int = 1120) -> Compose:
     return Compose([
         # PadIfNeeded(min_height=height, min_width=width),
-        HorizontalFlip(p=0.5),
+        #HorizontalFlip(p=0.5),
         # VerticalFlip(p=0.5),
         # RandomRotate90(p=0.5),
         ToTensorV2(transpose_mask=True), ])

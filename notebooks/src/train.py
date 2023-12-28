@@ -23,7 +23,7 @@ def main(cfg):
     gc.enable()
     accelerate = Accelerator(
         mixed_precision="fp16", log_with=["wandb"],
-        kwargs_handlers=[DistributedDataParallelKwargs(gradient_as_bucket_view=True, find_unused_parameters=False), ],
+        kwargs_handlers=[DistributedDataParallelKwargs(gradient_as_bucket_view=True, find_unused_parameters=True), ],
         project_dir="logs"
     )
     accelerate.init_trackers(project_name="SenNetKidney", config=cfg)

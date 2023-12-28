@@ -34,22 +34,22 @@ def inference_loop(model: nn.Module, images: torch.Tensor) -> torch.Tensor:
     outputs = None
     counter = 0
     with torch.no_grad() and autocast():
-        outputs_batch = model(images).sigmoid().detach().cpu().float()
+        outputs_batch = model(images, inference=True).sigmoid().detach().cpu().float()
         outputs = outputs_batch
         counter += 1
-        outputs_batch = model(torch.flip(images, dims=[2, ])).sigmoid().detach().cpu().float()
+        outputs_batch = model(torch.flip(images, dims=[2, ]), inference=True).sigmoid().detach().cpu().float()
         outputs += torch.flip(outputs_batch, dims=[2, ])
         counter += 1
-        outputs_batch = model(torch.flip(images, dims=[3, ])).sigmoid().detach().cpu().float()
+        outputs_batch = model(torch.flip(images, dims=[3, ]), inference=True).sigmoid().detach().cpu().float()
         outputs += torch.flip(outputs_batch, dims=[3, ])
         counter += 1
-        outputs_batch = model(torch.rot90(images, k=1, dims=[2, 3])).sigmoid().detach().cpu().float()
+        outputs_batch = model(torch.rot90(images, k=1, dims=[2, 3]), inference=True).sigmoid().detach().cpu().float()
         outputs += torch.rot90(outputs_batch, k=-1, dims=[2, 3])
         counter += 1
-        outputs_batch = model(torch.rot90(images, k=2, dims=[2, 3])).sigmoid().detach().cpu().float()
+        outputs_batch = model(torch.rot90(images, k=2, dims=[2, 3]), inference=True).sigmoid().detach().cpu().float()
         outputs += torch.rot90(outputs_batch, k=-2, dims=[2, 3])
         counter += 1
-        outputs_batch = model(torch.rot90(images, k=3, dims=[2, 3])).sigmoid().detach().cpu().float()
+        outputs_batch = model(torch.rot90(images, k=3, dims=[2, 3]), inference=True).sigmoid().detach().cpu().float()
         outputs += torch.rot90(outputs_batch, k=-3, dims=[2, 3])
         counter += 1
 
@@ -125,13 +125,23 @@ def inference_fn(model: nn.Module, data_loader: DataLoader, data_loader_xz: Data
     gc.collect()
     return rles_list, image_ids_all
 
+def return_model(model_name: str, in_channels: int, classes: int):
+    model = smp.Unet(
+        encoder_name=model_name,
+        encoder_weights="imagenet",
+        in_channels=in_channels,
+        classes=classes,
 
+
+    )
+    return model
 def main(cfg: dict):
     global volume_uncompressed
     seed_everything(cfg['seed'])
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     test_dirs = ["/home/mithil/PycharmProjects/SenNetKideny/data/train/kidney_3_sparse", ]
-    model = ReturnModel(cfg['model_name'], cfg['in_channels'], cfg['classes'], inference=True)
+    #model = ReturnModel(cfg['model_name'], cfg['in_channels'], cfg['classes'], inference=True)
+    model = return_model(cfg['model_name'], cfg['in_channels'], cfg['classes'])
     model.to(device)
     model.load_state_dict(torch.load(cfg["model_path"], map_location=torch.device('cuda')))
 
@@ -159,9 +169,9 @@ def main(cfg: dict):
         test_loader_yz = DataLoader(test_dataset_yz, batch_size=cfg['batch_size'] * 2, shuffle=False,
                                     num_workers=cfg['num_workers'], pin_memory=True)
         rles_list, image_ids = inference_fn(model=model, data_loader=test_loader,
-                                                                 data_loader_xz=test_loader_xz,
-                                                                 data_loader_yz=test_loader_yz,
-                                                                 device=device, volume_shape=volume.shape[:3])
+                                            data_loader_xz=test_loader_xz,
+                                            data_loader_yz=test_loader_yz,
+                                            device=device, volume_shape=volume.shape[:3])
         global_rle_list.extend(rles_list)
         global_image_ids.extend(image_ids)
         del volume, test_dataset_xy, test_dataset_xz, test_dataset_yz, test_loader, test_loader_xz, test_loader_yz
@@ -180,8 +190,8 @@ config = {
     "in_channels": 3,
     "classes": 2,
     # "test_dir": '/kaggle/input/blood-vessel-segmentation/test',
-    "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/seresnext101d_32x8d_pad_kidney_multiview_hflip/model.pth",
-    "batch_size": 4,
+    "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/seresnext101_32x8d_pad_kidney_multiview_retrain/model.pth",
+    "batch_size": 2,
     "num_workers": 8,
 }
 if __name__ == "__main__":
