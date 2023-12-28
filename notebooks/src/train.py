@@ -23,7 +23,7 @@ def main(cfg):
     gc.enable()
     accelerate = Accelerator(
         mixed_precision="fp16", log_with=["wandb"],
-        kwargs_handlers=[DistributedDataParallelKwargs(gradient_as_bucket_view=True, find_unused_parameters=True), ],
+        kwargs_handlers=[DistributedDataParallelKwargs(gradient_as_bucket_view=True, find_unused_parameters=False), ],
         project_dir="logs"
     )
     accelerate.init_trackers(project_name="SenNetKidney", config=cfg)
@@ -36,7 +36,7 @@ def main(cfg):
     train_kidneys_rle = list(map(lambda x: kidney_rle[f"kidney_1_dense_{x.split('.')[0]}"], train_images))
     train_images = list(map(lambda x: f"{cfg['train_dir']}/images/{x}", train_images))
     train_masks = list(map(lambda x: x.replace("images", "labels"), train_images))
-    validation_kidneys_rle = list(map(lambda x: kidney_rle[f"kidney_3_sparse_{x.split('.')[0]}"], validation_images))
+    validation_kidneys_rle = list(map(lambda x: kidney_rle[f"kidney_3_dense_{x.split('.')[0]}"], validation_images))
     validation_images = list(map(lambda x: f"{cfg['validation_dir']}/images/{x}", validation_images))
     validation_masks = list(map(lambda x: x.replace("images", "labels"), validation_images))
     train_xz_kidneys_rle = list(map(lambda x: kidney_rle[f"kidney_1_dense_xz_{x.split('.')[0]}"], train_images_xz))

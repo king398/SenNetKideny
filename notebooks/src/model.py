@@ -17,7 +17,7 @@ class ReturnModel(nn.Module):
             in_channels=in_channels,
             classes=classes,
         )
-        # if not inference:
+        #if not inference:
         #    self.unet.encoder.model.set_grad_checkpointing(True)
         self.inference = inference
 
@@ -39,7 +39,7 @@ class ReturnModel(nn.Module):
 
         return x
 
-    def _pad_image(self, x: torch.Tensor, pad_factor: int = 32):
+    def _pad_image(self, x: torch.Tensor, pad_factor: int = 224):
         h, w = x.shape[2], x.shape[3]
         h_pad = (pad_factor - h % pad_factor) % pad_factor
         w_pad = (pad_factor - w % pad_factor) % pad_factor

@@ -125,23 +125,13 @@ def inference_fn(model: nn.Module, data_loader: DataLoader, data_loader_xz: Data
     gc.collect()
     return rles_list, image_ids_all
 
-def return_model(model_name: str, in_channels: int, classes: int):
-    model = smp.Unet(
-        encoder_name=model_name,
-        encoder_weights="imagenet",
-        in_channels=in_channels,
-        classes=classes,
 
-
-    )
-    return model
 def main(cfg: dict):
     global volume_uncompressed
     seed_everything(cfg['seed'])
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     test_dirs = ["/home/mithil/PycharmProjects/SenNetKideny/data/train/kidney_3_sparse", ]
-    #model = ReturnModel(cfg['model_name'], cfg['in_channels'], cfg['classes'], inference=True)
-    model = return_model(cfg['model_name'], cfg['in_channels'], cfg['classes'])
+    model = ReturnModel(cfg['model_name'], cfg['in_channels'], cfg['classes'], inference=True)
     model.to(device)
     model.load_state_dict(torch.load(cfg["model_path"], map_location=torch.device('cuda')))
 
@@ -190,7 +180,7 @@ config = {
     "in_channels": 3,
     "classes": 2,
     # "test_dir": '/kaggle/input/blood-vessel-segmentation/test',
-    "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/seresnext101_32x8d_pad_kidney_multiview_retrain/model.pth",
+    "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/seresnext101d_32x8d_pad_kidney_multiview_check_25_epochs/model.pth",
     "batch_size": 2,
     "num_workers": 8,
 }

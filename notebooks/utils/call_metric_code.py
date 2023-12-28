@@ -9,7 +9,7 @@ solution_df['height'] = 1706
 solution_df['group'] = 'kidney_3_dense'
 solution_df['slice'] = np.arange(len(solution_df))
 
-model_dir = "seresnext101d_32x8d_pad_kidney_multiview_check_retrain_no_flip"
+model_dir = "seresnext101d_32x8d_pad_kidney_multiview_check_25_epochs"
 #submission_df = pd.read_csv(f"/home/mithil/PycharmProjects/SenNetKideny/models/{model_dir}/oof_csv.csv")
 submission_df = pd.read_csv(f"/home/mithil/PycharmProjects/SenNetKideny/oof.csv")
 # replace sparse with dense
