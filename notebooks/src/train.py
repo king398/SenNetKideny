@@ -23,7 +23,7 @@ def main(cfg):
     gc.enable()
     accelerate = Accelerator(
         mixed_precision="fp16", log_with=["wandb"],
-        kwargs_handlers=[DistributedDataParallelKwargs(gradient_as_bucket_view=True, find_unused_parameters=False), ],
+        kwargs_handlers=[DistributedDataParallelKwargs(gradient_as_bucket_view=True, find_unused_parameters=True), ],
         project_dir="logs",
         gradient_accumulation_steps=int(cfg['gradient_accumulation_steps'])
     )
@@ -102,10 +102,11 @@ def main(cfg):
         )
         accelerate.wait_for_everyone()
         if dice_score > best_dice:
-            best_dice = best_dice
-        unwrapped_model = accelerate.unwrap_model(model)
-        model_weights = unwrapped_model.state_dict()
-        accelerate.save(model_weights, f"{cfg['model_dir']}/model.pth")
+            best_dice = dice_score
+            unwrapped_model = accelerate.unwrap_model(model)
+            model_weights = unwrapped_model.state_dict()
+            accelerate.save(model_weights, f"{cfg['model_dir']}/model.pth")
+            accelerate.print(f" Model saved with dice score {best_dice}")
 
     accelerate.end_training()
 

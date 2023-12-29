@@ -33,7 +33,7 @@ class ReturnModel(nn.Module):
         if inference:
             x = self.unet.encoder(x)
         else:
-            x = checkpoint(self.unet.encoder, x, use_reentrant=False)
+            x = checkpoint(self.unet.encoder, x, )
 
         x = self.unet.decoder(*x)
         x = self.unet.segmentation_head(x)

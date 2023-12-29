@@ -117,7 +117,8 @@ def inference_fn(model: nn.Module, data_loader: DataLoader, data_loader_xz: Data
 
     gc.collect()
     volume = volume / 3
-    volume = apply_hysteresis_thresholding(volume, 0.2, 0.6)
+    #volume = apply_hysteresis_thresholding(volume, 0.2, 0.6)
+    volume = (volume > 0.1)
     volume = (volume * 255).astype(np.uint8)
     for output_mask in volume:
         rles_list.append(rle_encode(output_mask))
@@ -176,11 +177,11 @@ def main(cfg: dict):
 
 config = {
     "seed": 42,
-    "model_name": "tu-timm/maxvit_small_tf_384.in1k",
+    "model_name": "tu-seresnext101d_32x8d",
     "in_channels": 3,
     "classes": 2,
     # "test_dir": '/kaggle/input/blood-vessel-segmentation/test',
-    "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/maxvit_small_tf_384_multiview/model.pth",
+    "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/seresnext101d_32x8d_pad_kidney_multiview_check_25_epochs/model.pth",
     "batch_size": 2,
     "num_workers": 8,
 }
