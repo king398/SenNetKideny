@@ -24,7 +24,8 @@ def main(cfg):
     accelerate = Accelerator(
         mixed_precision="fp16", log_with=["wandb"],
         kwargs_handlers=[DistributedDataParallelKwargs(gradient_as_bucket_view=True, find_unused_parameters=False), ],
-        project_dir="logs"
+        project_dir="logs",
+        gradient_accumulation_steps=int(cfg['gradient_accumulation_steps'])
     )
     accelerate.init_trackers(project_name="SenNetKidney", config=cfg)
     kidneys_df = pd.read_csv(cfg['kidneys_df'])
@@ -63,7 +64,8 @@ def main(cfg):
                                  num_workers=cfg['num_workers'], pin_memory=True)
     model = ReturnModel(cfg['model_name'], in_channels=cfg['in_channels'], classes=cfg['classes'])
     optimizer = bnb.optim.AdamW8bit(model.parameters(), lr=float(cfg['lr']))
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=int(len(train_loader) * 5),
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=int(
+        (len(train_loader) + len(train_loader_yz) + len(train_loader_xz))) * 5,
                                                                      eta_min=float(cfg['min_lr']))
     train_loader, valid_loader, model, optimizer, scheduler, train_loader_yz, train_loader_xz = accelerate.prepare(
         train_loader,
@@ -85,8 +87,8 @@ def main(cfg):
             optimizer=optimizer,
             scheduler=scheduler,
             epoch=epoch,
-            fold=0,
             accelerator=accelerate,
+            gradient_accumulation_steps=int(cfg['gradient_accumulation_steps']),
 
         )
 
@@ -95,7 +97,6 @@ def main(cfg):
             model=model,
             criterion=criterion,
             epoch=epoch,
-            fold=0,
             accelerator=accelerate,
 
         )

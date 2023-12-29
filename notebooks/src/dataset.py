@@ -73,7 +73,7 @@ class ImageDatasetOOF(Dataset):
         image_shape = image.shape
         image_shape = tuple(str(element) for element in image_shape)
 
-        image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         image = (image - image.min()) / (image.max() - image.min() + 0.0001)
         image = self.transform(image=image)
         return image, image_shape, image_id
@@ -87,7 +87,7 @@ class CombinedDataLoader:
 
     def __next__(self):
         # Randomly pick a dataloader
-        dataloader = random.choice(self.iterators)
+        dataloader =self.iterators[0]
 
         # Try to fetch the next batch from this dataloader
         try:

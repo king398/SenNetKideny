@@ -29,7 +29,7 @@ def train_fn(
         scheduler: optim.lr_scheduler.LRScheduler,
         epoch: int,
         accelerator: Accelerator,
-        fold: int,
+        gradient_accumulation_steps: int = 1,
 
 ):
     gc.collect()
@@ -42,21 +42,23 @@ def train_fn(
     train_loader = CombinedDataLoader(train_loader, train_loader_xz, train_loader_yz)
     stream = tqdm(train_loader, total=len(train_loader), disable=not accelerator.is_local_main_process, **tqdm_style)
     for i, (images, masks) in enumerate(stream):
-        masks = masks.float()
-        images = images.float()
-        output = model(images)
-        loss = criterion(output, masks)
-        accelerator.backward(loss)
-        optimizer.step()
-        optimizer.zero_grad()
-        outputs, masks = accelerator.gather_for_metrics((output, masks))
-        loss_metric += loss.item() / (i + 1)
-        dice_batch = dice(outputs, masks)
-        stream.set_description(
-            f"Epoch:{epoch + 1}, train_loss: {loss_metric:.5f}, dice_batch: {dice_batch.item():.5f}")
-        scheduler.step()
-        accelerator.log({f"train_loss_{fold}": loss_metric, f"train_dice_batch_{fold}": dice_batch.item(),
-                         f"lr_{fold}": optimizer.param_groups[0]['lr']})
+        with accelerator.accumulate(model):
+            masks = masks.float()
+            images = images.float()
+            output = model(images)
+            loss = criterion(output, masks)
+            accelerator.backward(loss)
+            optimizer.step()
+            #scheduler.step()
+            optimizer.zero_grad()
+
+            outputs, masks = accelerator.gather_for_metrics((output, masks))
+            loss_metric += loss.item() / (i + 1)
+            dice_batch = dice(outputs, masks)
+            stream.set_description(
+                f"Epoch:{epoch + 1}, train_loss: {loss_metric:.5f}, dice_batch: {dice_batch.item():.5f}")
+            accelerator.log({f"train_loss": loss_metric, f"train_dice_batch": dice_batch.item(),
+                             f"lr": optimizer.param_groups[0]['lr']})
 
 
 def validation_fn(
@@ -65,7 +67,6 @@ def validation_fn(
         criterion: Module,
         epoch: int,
         accelerator: Accelerator,
-        fold: int,
 ):
     gc.collect()
     torch.cuda.empty_cache()
@@ -113,7 +114,7 @@ def validation_fn(
                 labels_df["rle"].append(rle_mask)
                 x += 1
 
-            accelerator.log({f"valid_loss_{fold}": loss_metric, f"valid_dice_batch_{fold}": dice_batch.item()})
+            accelerator.log({f"valid_loss": loss_metric, f"valid_dice_batch": dice_batch.item()})
     labels_df = pd.DataFrame(labels_df)
     labels_df['width'] = 1510
     labels_df['height'] = 1706
