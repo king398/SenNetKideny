@@ -30,10 +30,7 @@ class ReturnModel(nn.Module):
         x, pad = self._pad_image(x)
 
         # Forward pass through Unet
-        if inference:
-            x = self.unet.encoder(x)
-        else:
-            x = checkpoint(self.unet.encoder, x, )
+        x = checkpoint(self.unet.encoder, x, )
 
         x = self.unet.decoder(*x)
         x = self.unet.segmentation_head(x)

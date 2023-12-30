@@ -133,4 +133,4 @@ def validation_fn(
         f"Epoch:{epoch + 1}, valid_loss: {loss_metric:.5f}, dice: {np.mean(dice_metric):.5f} ,surface_dice: {max_surface_dice:.5f} ,threshold_score_dict   {threshold_score_dict} ")
     accelerator.log({f"surface_dice": max_surface_dice})
 
-    return np.mean(dice_metric)
+    return max_surface_dice

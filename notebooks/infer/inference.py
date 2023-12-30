@@ -19,7 +19,8 @@ import pandas as pd
 from albumentations import CenterCrop
 from typing import Literal
 from skimage import filters
-from torch.utils.checkpoint import  checkpoint
+from torch.utils.checkpoint import checkpoint
+
 
 def apply_hysteresis_thresholding(volume: np.array, low: float, high: float, chunk_size: int = 32):
     """
@@ -147,27 +148,25 @@ class ReturnModel(nn.Module):
     def __init__(self, model_name: str, in_channels: int, classes: int, inference: bool = False):
         super(ReturnModel, self).__init__()
         # Initialize the Unet model
-        if inference:
-           encoder_weights = None
-        else:
-           encoder_weights = "imagenet"
         self.unet = smp.Unet(
             encoder_name=model_name,
-            encoder_weights=encoder_weights,
+            encoder_weights=None,
             in_channels=in_channels,
             classes=classes,
         )
-        # if not inference:
-        #    self.unet.encoder.model.set_grad_checkpointing(True)
         self.inference = inference
 
-    def forward(self, x):
+    def forward(self, x, inference: bool = True):
         # Pad the input
         original_size = x.shape[2:]
         x, pad = self._pad_image(x)
 
         # Forward pass through Unet
-        x = checkpoint(self.unet.encoder, x)
+        if inference:
+            x = self.unet.encoder(x)
+        else:
+            x = checkpoint(self.unet.encoder, x, )
+
         x = self.unet.decoder(*x)
         x = self.unet.segmentation_head(x)
         # Remove padding
@@ -175,7 +174,7 @@ class ReturnModel(nn.Module):
 
         return x
 
-    def _pad_image(self, x: torch.Tensor, pad_factor: int = 32):
+    def _pad_image(self, x: torch.Tensor, pad_factor: int = 384):
         h, w = x.shape[2], x.shape[3]
         h_pad = (pad_factor - h % pad_factor) % pad_factor
         w_pad = (pad_factor - w % pad_factor) % pad_factor
@@ -190,20 +189,6 @@ class ReturnModel(nn.Module):
         return x[:, :, pad[2]:h + pad[2], pad[0]:w + pad[0]]
 
 
-def reverse_padding(image: np.array, original_height: int, original_width: int):
-    """
-    Crops the padded image back to its original dimensions.
-
-    :param image: Padded image.
-    :param original_height: Original height of the image before padding.
-    :param original_width: Original width of the image before padding.
-    :return: Cropped image with original dimensions.
-    """
-    # Define the cropping transformation
-    transform = CenterCrop(height=original_height, width=original_width)
-
-    # Apply the transformation
-    return transform(image=image)['image']
 
 
 def inference_loop(model: nn.Module, images: torch.Tensor) -> torch.Tensor:
@@ -311,7 +296,7 @@ def main(cfg: dict):
     model = ReturnModel(cfg['model_name'], cfg['in_channels'], cfg['classes'], inference=True)
     model.to(device)
     model.load_state_dict(torch.load(cfg["model_path"], map_location=torch.device('cuda')))
-    model = nn.DataParallel(model)
+    # model = nn.DataParallel(model)
 
     global_rle_list = []
     global_image_ids = []
@@ -345,12 +330,12 @@ def main(cfg: dict):
 
 config = {
     "seed": 42,
-    "model_name": "mit_b5",
+    "model_name": "tu-seresnext101d_32x8d",
     "in_channels": 3,
     "classes": 2,
     "test_dir": '/kaggle/input/blood-vessel-segmentation/test',
-    "model_path": "/kaggle/input/senet-models/mit_b5_multiview/model.pth",
-    "batch_size": 4,
+    "model_path": "/kaggle/input/senet-models/seresnext101d_32x8d_pad_kidney_multiview_15_epoch_5e_04/model.pth",
+    "batch_size": 2,
     "num_workers": 4,
     "threshold": 0.15,
 }

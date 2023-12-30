@@ -107,7 +107,7 @@ def main(cfg):
             model_weights = unwrapped_model.state_dict()
             accelerate.save(model_weights, f"{cfg['model_dir']}/model.pth")
             accelerate.print(f" Model saved with dice score {best_dice}")
-
+    accelerate.print(f"=" * 50 + f" Best dice score {best_dice}" + f"=" * 50)
     accelerate.end_training()
 
 
