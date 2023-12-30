@@ -103,7 +103,8 @@ def validation_fn(
                 # iterate from threshold 0.1 to 0.5
                 threshold = [0.1, 0.2, 0.3, 0.4, 0.5]
                 for m, t in enumerate(threshold):
-                    output_mask_new = (output_mask > t).astype(np.uint8)
+                    output_mask_new = output_mask.copy()
+                    output_mask_new = (output_mask_new > t).astype(np.uint8)
                     rle_mask = rle_encode(output_mask_new)
                     pd_dataframes[m]["id"].append(f"kidney_3_dense_{j:04d}")
                     pd_dataframes[m]["rle"].append(rle_mask)

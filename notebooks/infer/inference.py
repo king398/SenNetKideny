@@ -1,6 +1,6 @@
+import os
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 import gc
-
-import albumentations
 import numpy as np
 import os
 from torch.utils.data import Dataset, DataLoader
@@ -16,10 +16,8 @@ from tqdm.auto import tqdm
 import glob
 from torch import nn
 import pandas as pd
-from albumentations import CenterCrop
 from typing import Literal
 from skimage import filters
-from torch.utils.checkpoint import checkpoint
 
 
 def apply_hysteresis_thresholding(volume: np.array, low: float, high: float, chunk_size: int = 32):
@@ -162,10 +160,7 @@ class ReturnModel(nn.Module):
         x, pad = self._pad_image(x)
 
         # Forward pass through Unet
-        if inference:
-            x = self.unet.encoder(x)
-        else:
-            x = checkpoint(self.unet.encoder, x, )
+        x = self.unet.encoder(x)
 
         x = self.unet.decoder(*x)
         x = self.unet.segmentation_head(x)
@@ -187,8 +182,6 @@ class ReturnModel(nn.Module):
     def _unpad(self, x, original_size, pad):
         h, w = original_size
         return x[:, :, pad[2]:h + pad[2], pad[0]:w + pad[0]]
-
-
 
 
 def inference_loop(model: nn.Module, images: torch.Tensor) -> torch.Tensor:
@@ -295,7 +288,7 @@ def main(cfg: dict):
     test_dirs = sorted(glob.glob(f"{cfg['test_dir']}/*"))
     model = ReturnModel(cfg['model_name'], cfg['in_channels'], cfg['classes'], inference=True)
     model.to(device)
-    model.load_state_dict(torch.load(cfg["model_path"], map_location=torch.device('cuda')))
+    model.load_state_dict(torch.load(cfg["model_path"], map_location=torch.device('cuda')),strict=True)
     # model = nn.DataParallel(model)
 
     global_rle_list = []
@@ -334,7 +327,7 @@ config = {
     "in_channels": 3,
     "classes": 2,
     "test_dir": '/kaggle/input/blood-vessel-segmentation/test',
-    "model_path": "/kaggle/input/senet-models/seresnext101d_32x8d_pad_kidney_multiview_15_epoch_5e_04/model.pth",
+    "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/seresnext101d_32x8d_pad_kidney_multiview_15_epoch_5e_04/model.pth",
     "batch_size": 2,
     "num_workers": 4,
     "threshold": 0.15,

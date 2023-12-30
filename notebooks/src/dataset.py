@@ -21,7 +21,6 @@ class ImageDataset(Dataset):
         image = cv2.imread(self.image_paths[item])
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         image = (image - image.min()) / (image.max() - image.min() + 0.0001)
-        original_shape = image.shape
         mask = cv2.imread(self.mask_paths[item])
         mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
         mask = mask / 255
