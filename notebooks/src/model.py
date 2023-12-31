@@ -100,5 +100,4 @@ class ReturnModelNextVit(nn.Module):
         return x[:, :, pad[2]:h + pad[2], pad[0]:w + pad[0]]
 
 
-model = ReturnModelNextVit("nextvit_base", 3, 2)
-print(model(torch.randn(1, 3, 224, 224)).shape)
+

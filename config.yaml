@@ -1,13 +1,13 @@
 batch_size: 4
 classes: 2
-epochs: 20
+epochs: 15
 gradient_accumulation_steps: 1
 in_channels: 3
 kidneys_df: /home/mithil/PycharmProjects/SenNetKideny/data/train_rles_kidneys.csv
 lr: 5e-04
 min_lr: 3e-06
-model_dir: /home/mithil/PycharmProjects/SenNetKideny/models/maxvit_small_tf_multiview_15_epoch_5e_04_dice_loss
-model_name: tu-timm/maxvit_small_tf_224.in1k
+model_dir: /home/mithil/PycharmProjects/SenNetKideny/models/nextvit_base_multiview_15_epoch_5e_04_dice_loss
+model_name: nextvit_base
 num_workers: 4
 seed: 42
 train_dir: /home/mithil/PycharmProjects/SenNetKideny/data/train/kidney_1_dense
