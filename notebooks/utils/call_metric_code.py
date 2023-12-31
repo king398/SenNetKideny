@@ -11,7 +11,7 @@ solution_df['slice'] = np.arange(len(solution_df))
 
 model_dir = "seresnext101d_32x8d_pad_kidney_multiview_15_epoch_5e_04"
 #submission_df = pd.read_csv(f"/home/mithil/PycharmProjects/SenNetKideny/models/{model_dir}/oof_csv.csv")
-submission_df = pd.read_csv(f"/home/mithil/PycharmProjects/SenNetKideny/notebooks/infer/submission.csv")
+submission_df = pd.read_csv(f"/home/mithil/PycharmProjects/SenNetKideny/submission.csv")
 # replace sparse with dense
 submission_df['id'] = submission_df['id'].apply(lambda x: x.replace('sparse', 'dense'))
 # only keep the id with are present in solution

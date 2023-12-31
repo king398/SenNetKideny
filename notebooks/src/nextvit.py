@@ -454,8 +454,14 @@ class NextViT(nn.Module):
 
     def forward(self, x):
         outputs = list()
-        x = self.stem(x)
+        outputs.append(x)
+
+        xx = self.stem[0](x)
+        xx = torch.nn.functional.avg_pool2d(xx, kernel_size=2, stride=2)
+        outputs.append(xx)
+
         stage_id = 0
+
         for idx, layer in enumerate(self.features):
             if self.use_checkpoint:
                 x = checkpoint.checkpoint(layer, x)
@@ -473,32 +479,8 @@ class NextViT(nn.Module):
 
 
 @register_model
-class nextvit_small(NextViT):
-    def __init__(self, resume='', **kwargs):
-        super(nextvit_small, self).__init__(
-            stem_chs=[64, 32, 64], depths=[3, 4, 10, 3], path_dropout=0.2, resume=resume, **kwargs
-        )
-
-
-@register_model
-class nextvit_base(NextViT):
-    def __init__(self, resume='', **kwargs):
-        super(nextvit_base, self).__init__(
-            stem_chs=[64, 32, 64], depths=[3, 4, 20, 3], path_dropout=0.2, resume=resume, **kwargs
-        )
-
-
-@register_model
-class nextvit_large(NextViT):
-    def __init__(self, resume='', **kwargs):
-        super(nextvit_large, self).__init__(
-            stem_chs=[64, 32, 64], depths=[3, 4, 30, 3], path_dropout=0.2, resume=resume, **kwargs
-        )
-
-
-@register_model
 def nextvit_small(pretrained=False, pretrained_cfg=None, **kwargs):
-    model = NextViT(stem_chs=[64, 32, 64], depths=[3, 4, 10, 3], path_dropout=0.1,
+    model = NextViT(stem_chs=[64, 32, 64], depths=[3, 4, 10, 3], path_dropout=0.1, use_checkpoint=True,
                     resume="/home/mithil/PycharmProjects/SenNetKideny/models/nexvit_pretrained/fpn_80k_nextvit_small_1n1k6m_pretrained.pth",
                     **kwargs,
                     )
@@ -507,7 +489,7 @@ def nextvit_small(pretrained=False, pretrained_cfg=None, **kwargs):
 
 @register_model
 def nextvit_base(pretrained=False, pretrained_cfg=None, **kwargs):
-    model = NextViT(stem_chs=[64, 32, 64], depths=[3, 4, 20, 3], path_dropout=0.2,
+    model = NextViT(stem_chs=[64, 32, 64], depths=[3, 4, 20, 3], path_dropout=0.2, use_checkpoint=True,
                     resume="/home/mithil/PycharmProjects/SenNetKideny/models/nexvit_pretrained/fpn_80k_nextvit_base_1n1k6m_pretrained.pth"
                     , **kwargs)
     return model
@@ -515,13 +497,12 @@ def nextvit_base(pretrained=False, pretrained_cfg=None, **kwargs):
 
 @register_model
 def nextvit_large(pretrained=False, pretrained_cfg=None, **kwargs):
-    model = NextViT(stem_chs=[64, 32, 64], depths=[3, 4, 30, 3], path_dropout=0.2,
+    model = NextViT(stem_chs=[64, 32, 64], depths=[3, 4, 30, 3], path_dropout=0.2, use_checkpoint=True,
                     resume="/home/mithil/PycharmProjects/SenNetKideny/models/nexvit_pretrained/fpn_80k_nextvit_large_1n1k6m_pretrained.pth",
                     **kwargs)
     return model
 
-
-import timm
-
-model = timm.create_model("nextvit_small", )
-features = model(torch.randn(1, 3, 256, 256))
+#model = nextvit_base()
+#x = model(torch.randn(1, 3, 384,384))
+#for i in x:
+#    print(i.shape)

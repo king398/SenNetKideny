@@ -62,8 +62,12 @@ def main(cfg):
                                  num_workers=cfg['num_workers'], pin_memory=True)
     train_loader_yz = DataLoader(train_dataset_yz, batch_size=cfg['batch_size'], shuffle=True,
                                  num_workers=cfg['num_workers'], pin_memory=True)
-    model = ReturnModel(cfg['model_name'], in_channels=cfg['in_channels'], classes=cfg['classes'])
-    optimizer = bnb.optim.AdamW8bit(model.parameters(), lr=float(cfg['lr']))
+    if cfg['model_name'].startswith("nextvit"):
+        model = ReturnModelNextVit(cfg['model_name'], in_channels=cfg['in_channels'], classes=cfg['classes'])
+
+    else:
+        model = ReturnModel(cfg['model_name'], in_channels=cfg['in_channels'], classes=cfg['classes'])
+    optimizer = torch.optim.AdamW(model.parameters(), lr=float(cfg['lr']))
     scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=int(
         (len(train_loader) + len(train_loader_yz) + len(train_loader_xz))) * 5,
                                                                      eta_min=float(cfg['min_lr']))

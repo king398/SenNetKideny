@@ -7,6 +7,7 @@ from typing import Tuple, List, Literal
 import torch
 
 
+
 class ImageDataset(Dataset):
     def __init__(self, image_paths: List[str], mask_paths: List[str], transform: Compose, kidney_rle: List[str]):
         self.image_paths = image_paths
@@ -31,7 +32,6 @@ class ImageDataset(Dataset):
         mask = augmented["mask"]
 
         return image, mask
-
 
 class ImageDatasetOOF(Dataset):
     def __init__(self, image_paths: list, transform, volume: np.array,

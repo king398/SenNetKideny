@@ -29,6 +29,5 @@ def reverse_padding(image: int, original_height: int, original_width: int):
 
 def get_valid_transform(height: int = 1792, width: int = 1568) -> Compose:
     return Compose([
-        PadIfNeeded(min_height=height, min_width=width),
         ToTensorV2(transpose_mask=True),
     ])

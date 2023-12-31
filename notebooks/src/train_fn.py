@@ -29,7 +29,6 @@ def train_fn(
         scheduler: optim.lr_scheduler.LRScheduler,
         epoch: int,
         accelerator: Accelerator,
-        gradient_accumulation_steps: int = 1,
 
 ):
     gc.collect()
@@ -42,7 +41,6 @@ def train_fn(
     train_loader = CombinedDataLoader(train_loader, train_loader_xz, train_loader_yz)
     stream = tqdm(train_loader, total=len(train_loader), disable=not accelerator.is_local_main_process, **tqdm_style)
     for i, (images, masks) in enumerate(stream):
-        with accelerator.accumulate(model):
             masks = masks.float()
             images = images.float()
             output = model(images)
