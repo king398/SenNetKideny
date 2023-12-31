@@ -39,7 +39,7 @@ def inference_loop(model: nn.Module, images: torch.Tensor) -> torch.Tensor:
         outputs_batch = model(images, inference=True).sigmoid().detach().cpu().float()
         outputs = outputs_batch
         counter += 1
-        outputs_batch = model(torch.flip(images, dims=[2, ]), inference=True).sigmoid().detach().cpu().float()
+        """outputs_batch = model(torch.flip(images, dims=[2, ]), inference=True).sigmoid().detach().cpu().float()
         outputs += torch.flip(outputs_batch, dims=[2, ])
         counter += 1
         outputs_batch = model(torch.flip(images, dims=[3, ]), inference=True).sigmoid().detach().cpu().float()
@@ -53,7 +53,7 @@ def inference_loop(model: nn.Module, images: torch.Tensor) -> torch.Tensor:
         counter += 1
         outputs_batch = model(torch.rot90(images, k=3, dims=[2, 3]), inference=True).sigmoid().detach().cpu().float()
         outputs += torch.rot90(outputs_batch, k=-3, dims=[2, 3])
-        counter += 1
+        counter += 1"""
 
     outputs /= counter
     outputs = outputs.detach().cpu().float()
@@ -87,6 +87,7 @@ def inference_fn(model: nn.Module, data_loader: DataLoader, data_loader_xz: Data
         gc.collect()
     global_counter = 0
     for i, (images, image_shapes, image_ids) in tqdm(enumerate(data_loader_xz), total=len(data_loader_xz)):
+        break
         images = images.to(device, non_blocking=True).float()
         outputs = inference_loop(model, images)
 
@@ -104,6 +105,7 @@ def inference_fn(model: nn.Module, data_loader: DataLoader, data_loader_xz: Data
     gc.collect()
     global_counter = 0
     for i, (images, image_shapes, image_ids) in tqdm(enumerate(data_loader_yz), total=len(data_loader_yz)):
+        break
         images = images.to(device, non_blocking=True).float()
         outputs = inference_loop(model, images)
         for j, image in enumerate(outputs):
@@ -118,10 +120,10 @@ def inference_fn(model: nn.Module, data_loader: DataLoader, data_loader_xz: Data
         del outputs, images
 
     gc.collect()
-    volume = volume / 3
+    #volume = volume / 3
     volume_no_threshold = volume.copy()
-    #volume = apply_hysteresis_thresholding(volume, 0.2, 0.6)
-    volume = volume > 0.3
+    volume = apply_hysteresis_thresholding(volume, 0.2, 0.6)
+    #volume = volume > 0.3
     volume = (volume * 255).astype(np.uint8)
     for output_mask in volume:
         rles_list.append(rle_encode(output_mask))
@@ -138,7 +140,7 @@ def main(cfg: dict):
     model = ReturnModel(cfg['model_name'], cfg['in_channels'], cfg['classes'], )
     model.to(device)
     model.load_state_dict(torch.load(cfg["model_path"], map_location=torch.device('cuda')))
-
+    model = nn.DataParallel(model)
     valid_rle = pd.read_csv("/home/mithil/PycharmProjects/SenNetKideny/data/kidney_3_dense_full.csv")
     valid_rle['id'] = valid_rle['id'].apply(lambda x: x.replace("kidney_3_dense", "kidney_3_sparse"))
     global_rle_list = []
@@ -153,7 +155,7 @@ def main(cfg: dict):
                                           volume=volume)
         test_dataset_yz = ImageDatasetOOF(test_files, get_valid_transform, mode='yz',
                                           volume=volume)
-        test_loader = DataLoader(test_dataset_xy, batch_size=cfg['batch_size'], shuffle=False,
+        test_loader = DataLoader(test_dataset_xy, batch_size=cfg['batch_size'] * 4, shuffle=False,
                                  num_workers=cfg['num_workers'], pin_memory=True)
         test_loader_xz = DataLoader(test_dataset_xz, batch_size=cfg['batch_size'] * 2, shuffle=False,
                                     num_workers=cfg['num_workers'], pin_memory=True)

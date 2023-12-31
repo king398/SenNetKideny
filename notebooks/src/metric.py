@@ -2,6 +2,7 @@ import torch
 import numpy as np
 import pandas as pd
 from torch import nn
+
 device = torch.device('cuda')  # can be 'cpu'
 torch_ver_major = int(torch.__version__.split('.')[0])
 
@@ -479,6 +480,8 @@ _NEIGHBOUR_CODE_TO_NORMALS = [[[0, 0, 0]], [[0.125, 0.125, 0.125]],
                               [[-0.25, -0.25, 0.0], [0.25, 0.25, -0.0]],
                               [[-0.125, -0.125, 0.125]],
                               [[0.125, 0.125, 0.125]], [[0, 0, 0]]]
+
+
 # pylint: enable=line-too-long
 
 
@@ -509,6 +512,7 @@ def create_table_neighbour_code_to_surface_area(spacing_mm):
         neighbour_code_to_surface_area[code] = sum_area
 
     return neighbour_code_to_surface_area
+
 
 def rle_decode(mask_rle: str, shape: tuple) -> np.array:
     """

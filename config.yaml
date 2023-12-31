@@ -1,6 +1,6 @@
 batch_size: 4
 classes: 2
-epochs: 25
+epochs: 20
 gradient_accumulation_steps: 1
 in_channels: 3
 kidneys_df: /home/mithil/PycharmProjects/SenNetKideny/data/train_rles_kidneys.csv
