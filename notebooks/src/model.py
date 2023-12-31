@@ -77,15 +77,13 @@ class ReturnModelNextVit(nn.Module):
     def forward(self, x):
         original_size = x.shape[2:]
         x, pad = self._pad_image(x)
-        features = self.encoder(x)
-        for i in features:
-            print(i.shape)
+        features = checkpoint(self.encoder, x)
         x = self.decoder(*features)
         x = self.segmentation_head(x)
         x = self._unpad(x, original_size, pad)
         return x
 
-    def _pad_image(self, x: torch.Tensor, pad_factor: int = 224):
+    def _pad_image(self, x: torch.Tensor, pad_factor: int = 32):
         h, w = x.shape[2], x.shape[3]
         h_pad = (pad_factor - h % pad_factor) % pad_factor
         w_pad = (pad_factor - w % pad_factor) % pad_factor

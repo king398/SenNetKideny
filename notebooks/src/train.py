@@ -30,7 +30,7 @@ def main(cfg):
     kidneys_df = pd.read_csv(cfg['kidneys_df'])
     kidney_rle = {kidneys_df['id'][i]: kidneys_df['kidney_rle'][i] for i in range(len(kidneys_df))}
     train_images = os.listdir(f"{cfg['train_dir']}/images/")
-    validation_images = os.listdir(f"{cfg['validation_dir']}/images/")
+    validation_images = sorted(os.listdir(f"{cfg['validation_dir']}/images/"))
     train_images_xz = os.listdir(f"{cfg['train_dir']}_xz/images/")
     train_images_yz = os.listdir(f"{cfg['train_dir']}_yz/images/")
     train_kidneys_rle = list(map(lambda x: kidney_rle[f"kidney_1_dense_{x.split('.')[0]}"], train_images))
@@ -49,6 +49,7 @@ def main(cfg):
     train_dataset = ImageDataset(train_images, train_masks, get_train_transform(), train_kidneys_rle)
     valid_dataset = ImageDataset(validation_images, validation_masks, get_valid_transform(),
                                  validation_kidneys_rle)
+    print(len(valid_dataset))
     train_dataset_xz = ImageDataset(train_images_xz, train_masks_xz, get_train_transform(),
                                     train_xz_kidneys_rle)
     train_dataset_yz = ImageDataset(train_images_yz, train_masks_yz, get_train_transform(),
@@ -62,6 +63,10 @@ def main(cfg):
                                  num_workers=cfg['num_workers'], pin_memory=True)
     valid_loader = DataLoader(valid_dataset, batch_size=cfg['batch_size'], shuffle=False,
                               num_workers=cfg['num_workers'], pin_memory=True)
+    #if cfg['model_name'].startswith("nextvit"):
+        #model = ReturnModelNextVit(cfg['model_name'], in_channels=cfg['in_channels'], classes=cfg['classes'],
+
+    #else:
     model = ReturnModel(cfg['model_name'], in_channels=cfg['in_channels'], classes=cfg['classes'])
     optimizer = torch.optim.AdamW(model.parameters(), lr=float(cfg['lr']))
     scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=int(len(train_loader) * 8),
@@ -76,6 +81,7 @@ def main(cfg):
     criterion = DiceLoss(mode="multilabel")
     best_dice = -1
     # remove all the rows which do not contain kidney_3_dense in the id column
+    labels_df = pd.read_csv(cfg['labels_df'])
 
     for epoch in range(cfg['epochs']):
         train_fn(
@@ -99,6 +105,7 @@ def main(cfg):
             criterion=criterion,
             epoch=epoch,
             accelerator=accelerate,
+            labels_df=labels_df
 
         )
         accelerate.wait_for_everyone()
