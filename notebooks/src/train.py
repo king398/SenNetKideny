@@ -13,7 +13,7 @@ from model import *
 import torch
 from train_fn import train_fn, validation_fn
 import argparse
-from segmentation_models_pytorch.losses import SoftBCEWithLogitsLoss
+from segmentation_models_pytorch.losses import DiceLoss
 import bitsandbytes as bnb
 
 
@@ -23,9 +23,8 @@ def main(cfg):
     gc.enable()
     accelerate = Accelerator(
         mixed_precision="fp16", log_with=["wandb"],
-        kwargs_handlers=[DistributedDataParallelKwargs(gradient_as_bucket_view=True, find_unused_parameters=True), ],
+        kwargs_handlers=[DistributedDataParallelKwargs(gradient_as_bucket_view=True, find_unused_parameters=True, ), ],
         project_dir="logs",
-        gradient_accumulation_steps=int(cfg['gradient_accumulation_steps'])
     )
     accelerate.init_trackers(project_name="SenNetKidney", config=cfg)
     kidneys_df = pd.read_csv(cfg['kidneys_df'])
@@ -37,7 +36,7 @@ def main(cfg):
     train_kidneys_rle = list(map(lambda x: kidney_rle[f"kidney_1_dense_{x.split('.')[0]}"], train_images))
     train_images = list(map(lambda x: f"{cfg['train_dir']}/images/{x}", train_images))
     train_masks = list(map(lambda x: x.replace("images", "labels"), train_images))
-    validation_kidneys_rle = list(map(lambda x: kidney_rle[f"kidney_3_dense_{x.split('.')[0]}"], validation_images))
+    validation_kidneys_rle = list(map(lambda x: kidney_rle[f"kidney_2_{x.split('.')[0]}"], validation_images))
     validation_images = list(map(lambda x: f"{cfg['validation_dir']}/images/{x}", validation_images))
     validation_masks = list(map(lambda x: x.replace("images", "labels"), validation_images))
     train_xz_kidneys_rle = list(map(lambda x: kidney_rle[f"kidney_1_dense_xz_{x.split('.')[0]}"], train_images_xz))
@@ -50,26 +49,22 @@ def main(cfg):
     train_dataset = ImageDataset(train_images, train_masks, get_train_transform(), train_kidneys_rle)
     valid_dataset = ImageDataset(validation_images, validation_masks, get_valid_transform(),
                                  validation_kidneys_rle)
-    train_dataset_xz = ImageDataset(train_images_xz, train_masks_xz, get_train_transform(height=928, width=2304),
+    train_dataset_xz = ImageDataset(train_images_xz, train_masks_xz, get_train_transform(),
                                     train_xz_kidneys_rle)
-    train_dataset_yz = ImageDataset(train_images_yz, train_masks_yz, get_train_transform(height=2304, width=1312),
+    train_dataset_yz = ImageDataset(train_images_yz, train_masks_yz, get_train_transform(),
                                     train_yz_kidneys_rle)
     train_loader = DataLoader(train_dataset, batch_size=cfg['batch_size'], shuffle=True, num_workers=cfg['num_workers'],
                               pin_memory=True)
-    valid_loader = DataLoader(valid_dataset, batch_size=cfg['batch_size'], shuffle=False,
-                              num_workers=cfg['num_workers'], pin_memory=True)
+
     train_loader_xz = DataLoader(train_dataset_xz, batch_size=cfg['batch_size'], shuffle=True,
                                  num_workers=cfg['num_workers'], pin_memory=True)
     train_loader_yz = DataLoader(train_dataset_yz, batch_size=cfg['batch_size'], shuffle=True,
                                  num_workers=cfg['num_workers'], pin_memory=True)
-    if cfg['model_name'].startswith("nextvit"):
-        model = ReturnModelNextVit(cfg['model_name'], in_channels=cfg['in_channels'], classes=cfg['classes'])
-
-    else:
-        model = ReturnModel(cfg['model_name'], in_channels=cfg['in_channels'], classes=cfg['classes'])
+    valid_loader = DataLoader(valid_dataset, batch_size=cfg['batch_size'], shuffle=False,
+                              num_workers=cfg['num_workers'], pin_memory=True)
+    model = ReturnModel(cfg['model_name'], in_channels=cfg['in_channels'], classes=cfg['classes'])
     optimizer = torch.optim.AdamW(model.parameters(), lr=float(cfg['lr']))
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=int(
-        (len(train_loader) + len(train_loader_yz) + len(train_loader_xz))) * 5,
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=int(len(train_loader) * 8),
                                                                      eta_min=float(cfg['min_lr']))
     train_loader, valid_loader, model, optimizer, scheduler, train_loader_yz, train_loader_xz = accelerate.prepare(
         train_loader,
@@ -78,8 +73,10 @@ def main(cfg):
         optimizer, scheduler, train_loader_yz, train_loader_xz
     )
 
-    criterion = SoftBCEWithLogitsLoss()
+    criterion = DiceLoss(mode="multilabel")
     best_dice = -1
+    # remove all the rows which do not contain kidney_3_dense in the id column
+
     for epoch in range(cfg['epochs']):
         train_fn(
 
@@ -91,8 +88,8 @@ def main(cfg):
             optimizer=optimizer,
             scheduler=scheduler,
             epoch=epoch,
+            fold=0,
             accelerator=accelerate,
-            gradient_accumulation_steps=int(cfg['gradient_accumulation_steps']),
 
         )
 
@@ -105,13 +102,12 @@ def main(cfg):
 
         )
         accelerate.wait_for_everyone()
+        unwrapped_model = accelerate.unwrap_model(model)
+        model_weights = unwrapped_model.state_dict()
         if dice_score > best_dice:
             best_dice = dice_score
-            unwrapped_model = accelerate.unwrap_model(model)
-            model_weights = unwrapped_model.state_dict()
             accelerate.save(model_weights, f"{cfg['model_dir']}/model.pth")
-            accelerate.print(f" Model saved with dice score {best_dice}")
-    accelerate.print(f"=" * 50 + f" Best dice score {best_dice}" + f"=" * 50)
+
     accelerate.end_training()
 
 

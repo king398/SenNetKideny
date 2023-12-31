@@ -70,7 +70,7 @@ def rle_encode(mask: np.array) -> str:
     return rle
 
 
-def get_valid_transform(image: np.array, original_height: int, original_width: int) -> np.array:
+def get_valid_transform(image: np.array, original_height: int, original_width: int,pad_factor:int=224) -> np.array:
     """
     Crops the padded image back to its original dimensions.
 
@@ -81,8 +81,8 @@ def get_valid_transform(image: np.array, original_height: int, original_width: i
     """
     # Define the cropping transformation
     # round up original height and width to nearest 32
-    original_height = int(np.ceil(original_height / 32) * 32)
-    original_width = int(np.ceil(original_width / 32) * 32)
+    original_height = int(np.ceil(original_height / pad_factor) * pad_factor)
+    original_width = int(np.ceil(original_width / pad_factor) * pad_factor)
     transform = Compose([
         PadIfNeeded(min_height=original_height, min_width=original_width),
         ToTensorV2(),
@@ -224,7 +224,7 @@ def inference_fn(model: nn.Module, data_loader: DataLoader, data_loader_xz: Data
     model.eval()
     rles_list = []
     image_ids_all = []
-    volume = np.zeros(volume_shape)
+    volume = np.zeros(volume_shape,dtype=np.float16)
     global_counter = 0
     for i, (images, image_shapes, image_ids) in tqdm(enumerate(data_loader), total=len(data_loader)):
         images = images.to(device, non_blocking=True).float()
@@ -340,13 +340,13 @@ def main(cfg: dict):
 
 config = {
     "seed": 42,
-    "model_name": "tu-timm/maxvit_small_tf_384.in1k",
+    "model_name": "tu-timm/maxvit_small_tf_224.in1k",
     "in_channels": 3,
     "classes": 2,
     "test_dir": '/kaggle/input/blood-vessel-segmentation/test',
-    "model_path": "/kaggle/input/senet-models/maxvit_small_tf_multiview_15_epoch_5e_04/model.pth",
+    "model_path": "/kaggle/input/senet-models/maxvit_small_tf_multiview_15_epoch_5e_04_dice_loss/model.pth",
     "batch_size": 2,
-    "num_workers": 4,
+    "num_workers": 0,
     "threshold": 0.15,
 }
 if __name__ == "__main__":

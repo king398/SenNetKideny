@@ -456,10 +456,14 @@ class NextViT(nn.Module):
         outputs = list()
         outputs.append(x)
 
+        #xx = self.stem[0](x)
+        #xx = torch.nn.functional.avg_pool2d(xx, kernel_size=2, stride=2)
+        #outputs.append(xx)
         xx = self.stem[0](x)
-        xx = torch.nn.functional.avg_pool2d(xx, kernel_size=2, stride=2)
         outputs.append(xx)
-
+        x = self.stem[1](xx)
+        x = self.stem[2](x)
+        x = self.stem[3](x)
         stage_id = 0
 
         for idx, layer in enumerate(self.features):

@@ -1,11 +1,9 @@
-
 from utils import *
 from torch.utils.data import Dataset
 import cv2
 from albumentations import Compose
 from typing import Tuple, List, Literal
 import torch
-
 
 
 class ImageDataset(Dataset):
@@ -18,7 +16,7 @@ class ImageDataset(Dataset):
     def __len__(self) -> int:
         return len(self.image_paths)
 
-    def __getitem__(self, item) -> Tuple[torch.Tensor, torch.Tensor,Tuple]:
+    def __getitem__(self, item) -> Tuple[torch.Tensor, torch.Tensor,]:
         image = cv2.imread(self.image_paths[item])
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         image = (image - image.min()) / (image.max() - image.min() + 0.0001)
@@ -32,6 +30,7 @@ class ImageDataset(Dataset):
         mask = augmented["mask"]
 
         return image, mask
+
 
 class ImageDatasetOOF(Dataset):
     def __init__(self, image_paths: list, transform, volume: np.array,
@@ -76,6 +75,8 @@ class ImageDatasetOOF(Dataset):
         image = (image - image.min()) / (image.max() - image.min() + 0.0001)
         image = self.transform(image=image)
         return image, image_shape, image_id
+
+
 class CombinedDataLoader:
     def __init__(self, *dataloaders):
         self.dataloaders = dataloaders
@@ -86,7 +87,7 @@ class CombinedDataLoader:
 
     def __next__(self):
         # Randomly pick a dataloader
-        dataloader =self.iterators[0]
+        dataloader = random.choice(self.iterators)
 
         # Try to fetch the next batch from this dataloader
         try:

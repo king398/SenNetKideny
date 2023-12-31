@@ -1,22 +1,21 @@
+import torch
 from tqdm.auto import tqdm
 import gc
-import gc
-from metric import compute_surface_dice_score
-import pandas as pd
-from accelerate import Accelerator
-from torch import optim
-from torch.nn import Module
 from torch.utils.data import DataLoader
-from tqdm.auto import tqdm
-from dataset import CombinedDataLoader
 from utils import *
-
+from torch.nn import Module
+from torch import optim
+from accelerate import Accelerator
+import pandas as pd
+from metric import compute_surface_dice_score
+from dataset import CombinedDataLoader
 dice = Dice()
 dice_valid = Dice_Valid()
 
-
-def get_color_escape(r, g, b, background=False):
-    return f'\033[{"48" if background else "38"};2;{r};{g};{b}m'
+tqdm_color = get_color_escape(0, 229, 255)  # Red color for example
+tqdm_style = {
+    'bar_format': f'{tqdm_color}{{l_bar}}{{bar}}| {{n_fmt}}/{{total_fmt}} [{{elapsed}}<{{remaining}},'
+                  f' {{rate_fmt}}{{postfix}}]{get_color_escape(255, 255, 255)}'}
 
 
 def train_fn(
@@ -29,34 +28,31 @@ def train_fn(
         scheduler: optim.lr_scheduler.LRScheduler,
         epoch: int,
         accelerator: Accelerator,
+        fold: int,
 
 ):
     gc.collect()
     torch.cuda.empty_cache()
     model.train()
     loss_metric = 0
-    tqdm_color = get_color_escape(255, 0, 0)  # Red color for example
-    tqdm_style = {
-        'bar_format': f'{tqdm_color}{{l_bar}}{{bar}}| {{n_fmt}}/{{total_fmt}} [{{elapsed}}<{{remaining}}, {{rate_fmt}}{{postfix}}]{get_color_escape(255, 255, 255)}'}
-    train_loader = CombinedDataLoader(train_loader, train_loader_xz, train_loader_yz)
-    stream = tqdm(train_loader, total=len(train_loader), disable=not accelerator.is_local_main_process, **tqdm_style)
-    for i, (images, masks) in enumerate(stream):
+    combined_loader  = CombinedDataLoader(train_loader, train_loader_xz, train_loader_yz)
+    stream = tqdm(combined_loader, total=len(combined_loader), disable=not accelerator.is_local_main_process, **tqdm_style)
+    for i, (images, masks,) in enumerate(stream):
             masks = masks.float()
             images = images.float()
             output = model(images)
             loss = criterion(output, masks)
             accelerator.backward(loss)
             optimizer.step()
-            #scheduler.step()
             optimizer.zero_grad()
-
             outputs, masks = accelerator.gather_for_metrics((output, masks))
             loss_metric += loss.item() / (i + 1)
             dice_batch = dice(outputs, masks)
             stream.set_description(
                 f"Epoch:{epoch + 1}, train_loss: {loss_metric:.5f}, dice_batch: {dice_batch.item():.5f}")
-            accelerator.log({f"train_loss": loss_metric, f"train_dice_batch": dice_batch.item(),
-                             f"lr": optimizer.param_groups[0]['lr']})
+            scheduler.step()
+            accelerator.log({f"train_loss_{fold}": loss_metric, f"train_dice_batch_{fold}": dice_batch.item(),
+                             f"lr_{fold}": optimizer.param_groups[0]['lr']})
 
 
 def validation_fn(
@@ -71,7 +67,6 @@ def validation_fn(
     model.eval()
     stream = tqdm(valid_loader, total=len(valid_loader), disable=not accelerator.is_local_main_process, )
     loss_metric = 0
-    dice_metric = []
     pd_dataframes = [{"id": [], "rle": []} for _ in range(5)]
     labels_df = {"id": [], "rle": []}
     j = 0
@@ -87,11 +82,8 @@ def validation_fn(
             loss_metric += loss.item() / (i + 1)
             outputs = outputs.sigmoid()
             outputs_not_multiply = outputs.detach().clone()
-            outputs = outputs[:, 0, :, :] * outputs[:, 1, :, :]
-            dice_batch = dice_valid(outputs, masks[:, 0, :, :])
-            dice_metric.append(dice_batch.item())
             stream.set_description(
-                f"Epoch:{epoch + 1}, valid_loss: {loss_metric:.5f}, dice_batch: {dice_batch.item():.5f}")
+                f"Epoch:{epoch + 1}, valid_loss: {loss_metric:.5f}")
             outputs_not_multiply = outputs_not_multiply.detach().cpu().float().numpy()
             masks = masks.detach().cpu().float().numpy()
             for p, image in enumerate(outputs_not_multiply):
@@ -113,7 +105,7 @@ def validation_fn(
                 labels_df["rle"].append(rle_mask)
                 x += 1
 
-            accelerator.log({f"valid_loss": loss_metric, f"valid_dice_batch": dice_batch.item()})
+            accelerator.log({f"valid_loss": loss_metric})
     labels_df = pd.DataFrame(labels_df)
     labels_df['width'] = 1510
     labels_df['height'] = 1706
@@ -129,7 +121,7 @@ def validation_fn(
     max_surface_dice = max(threshold_score_dict.values())
     best_threshold = list(threshold_score_dict.keys())[list(threshold_score_dict.values()).index(max_surface_dice)]
     accelerator.print(
-        f"Epoch:{epoch + 1}, valid_loss: {loss_metric:.5f}, dice: {np.mean(dice_metric):.5f} ,surface_dice: {max_surface_dice:.5f} ,threshold_score_dict   {threshold_score_dict} ")
+        f"Epoch:{epoch + 1}, valid_loss: {loss_metric:.5f} ,surface_dice: {max_surface_dice:.5f} ,threshold_score_dict   {threshold_score_dict} ")
     accelerator.log({f"surface_dice": max_surface_dice})
 
     return max_surface_dice

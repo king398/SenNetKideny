@@ -120,7 +120,8 @@ def inference_fn(model: nn.Module, data_loader: DataLoader, data_loader_xz: Data
     gc.collect()
     volume = volume / 3
     volume_no_threshold = volume.copy()
-    volume = apply_hysteresis_thresholding(volume, 0.2, 0.6)
+    #volume = apply_hysteresis_thresholding(volume, 0.2, 0.6)
+    volume = volume > 0.3
     volume = (volume * 255).astype(np.uint8)
     for output_mask in volume:
         rles_list.append(rle_encode(output_mask))
@@ -133,7 +134,7 @@ def main(cfg: dict):
     global volume_uncompressed
     seed_everything(cfg['seed'])
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    test_dirs = ["/home/mithil/PycharmProjects/SenNetKideny/data/train/kidney_3_sparse", ]
+    test_dirs = ["/home/mithil/PycharmProjects/SenNetKideny/data/train/kidney_2", ]
     model = ReturnModel(cfg['model_name'], cfg['in_channels'], cfg['classes'], )
     model.to(device)
     model.load_state_dict(torch.load(cfg["model_path"], map_location=torch.device('cuda')))
@@ -179,12 +180,12 @@ def main(cfg: dict):
 
 config = {
     "seed": 42,
-    "model_name": "tu-seresnext101d_32x8d",
+    "model_name": "tu-timm/maxvit_small_tf_224.in1k",
     "in_channels": 3,
     "classes": 2,
     # "test_dir": '/kaggle/input/blood-vessel-segmentation/test',
-    "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/seresnext101d_32x8d_pad_kidney_multiview_15_epoch_5e_04/model.pth",
-    "batch_size": 4,
+    "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/maxvit_small_tf_multiview_15_epoch_5e_04_dice_loss/model.pth",
+    "batch_size": 2,
     "num_workers": 8,
 }
 if __name__ == "__main__":

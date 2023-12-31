@@ -1,13 +1,11 @@
 import segmentation_models_pytorch as smp
 import timm
 from segmentation_models_pytorch.decoders.unet.decoder import UnetDecoder
-from segmentation_models_pytorch.encoders import TimmUniversalEncoder
 from torch.utils.checkpoint import checkpoint
 from nextvit import *
 from segmentation_models_pytorch.base.heads import SegmentationHead
 from torch import nn
 import torch
-
 
 class ReturnModel(nn.Module):
     def __init__(self, model_name: str, in_channels: int, classes: int, inference: bool = False):
@@ -59,7 +57,7 @@ class ReturnModelNextVit(nn.Module):
         # Initialize the Unet model
         if not model_name.startswith("nextvit"):
             raise ValueError("This Class is only for NextVit models")
-        self.decoder_channels = (256, 128, 64, 32, 16)
+        self.decoder_channels = (1024, 512, 256, 96, 64)
         self.encoder = timm.create_model(model_name)
         self.decoder = UnetDecoder(
             decoder_channels=self.decoder_channels,
@@ -102,5 +100,5 @@ class ReturnModelNextVit(nn.Module):
         return x[:, :, pad[2]:h + pad[2], pad[0]:w + pad[0]]
 
 
-#model = ReturnModelNextVit("nextvit_base", 3, 2)
-#model(torch.randn(1, 3, 224, 224))
+model = ReturnModelNextVit("nextvit_base", 3, 2)
+print(model(torch.randn(1, 3, 224, 224)).shape)

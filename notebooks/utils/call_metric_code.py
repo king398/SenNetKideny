@@ -2,16 +2,16 @@ from notebooks.src.metric import compute_surface_dice_score
 import pandas as pd
 import numpy as np
 
-solution_df = pd.read_csv("/home/mithil/PycharmProjects/SenNetKideny/data/kidney_3_dense_full_self_encode.csv")
+solution_df = pd.read_csv("/home/mithil/PycharmProjects/SenNetKideny/data/kidney_2_solution.csv")
 
 solution_df['width'] = 1510
 solution_df['height'] = 1706
 solution_df['group'] = 'kidney_3_dense'
 solution_df['slice'] = np.arange(len(solution_df))
 
-model_dir = "seresnext101d_32x8d_pad_kidney_multiview_15_epoch_5e_04"
-#submission_df = pd.read_csv(f"/home/mithil/PycharmProjects/SenNetKideny/models/{model_dir}/oof_csv.csv")
-submission_df = pd.read_csv(f"/home/mithil/PycharmProjects/SenNetKideny/submission.csv")
+model_dir = "maxvit_small_tf_multiview_15_epoch_5e_04_dice_loss"
+submission_df = pd.read_csv(f"/home/mithil/PycharmProjects/SenNetKideny/models/{model_dir}/oof_csv.csv")
+#submission_df = pd.read_csv(f"/home/mithil/PycharmProjects/SenNetKideny/submission.csv")
 # replace sparse with dense
 submission_df['id'] = submission_df['id'].apply(lambda x: x.replace('sparse', 'dense'))
 # only keep the id with are present in solution
