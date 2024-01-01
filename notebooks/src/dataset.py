@@ -1,3 +1,5 @@
+import numpy as np
+
 from utils import *
 from torch.utils.data import Dataset
 import cv2
@@ -16,10 +18,10 @@ class ImageDataset(Dataset):
     def __len__(self) -> int:
         return len(self.image_paths)
 
-    def __getitem__(self, item) -> Tuple[torch.Tensor, torch.Tensor,str]:
+    def __getitem__(self, item) -> Tuple[torch.Tensor, torch.Tensor, str]:
         image = cv2.imread(self.image_paths[item])
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        image = (image - image.min()) / (image.max() - image.min() + 0.0001)
+        #image = (image - image.min()) / (image.max() - image.min() + 0.0001)
         mask = cv2.imread(self.mask_paths[item])
         mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
         mask = mask / 255
@@ -74,7 +76,8 @@ class ImageDatasetOOF(Dataset):
         image_shape = tuple(str(element) for element in image_shape)
 
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        image = (image - image.min()) / (image.max() - image.min() + 0.0001)
+        image = image.astype("float")
+        #image = (image - image.min()) / (image.max() - image.min() + 0.0001)
         image = self.transform(image=image)
         return image, image_shape, image_id
 

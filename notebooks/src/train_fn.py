@@ -39,13 +39,13 @@ def train_fn(
     torch.cuda.empty_cache()
     model.train()
     loss_metric = 0
-    combined_loader = CombinedDataLoader(train_loader, train_loader_xz, train_loader_yz, train_loader_2,
-                                         train_loader_2_xz, train_loader_2_yz)
+    combined_loader = CombinedDataLoader(train_loader, train_loader_xz, train_loader_yz, )
     stream = tqdm(combined_loader, total=len(combined_loader), disable=not accelerator.is_local_main_process,
                   **tqdm_style)
     for i, (images, masks, image_ids) in enumerate(stream):
         masks = masks.float()
         images = images.float()
+        images = norm_with_clip(images.reshape(-1, *images.shape[2:]), ).reshape(images.shape)
         output = model(images)
         loss = criterion(output, masks)
         accelerator.backward(loss)
@@ -82,6 +82,8 @@ def validation_fn(
         for i, (images, masks, image_ids) in enumerate(stream):
             masks = masks.float()
             images = images.float()
+            images = norm_with_clip(images.reshape(-1, *images.shape[2:]), ).reshape(images.shape)
+
             output = model(images, )
             loss = criterion(output, masks)
             outputs, masks, = accelerator.gather((output, masks,))

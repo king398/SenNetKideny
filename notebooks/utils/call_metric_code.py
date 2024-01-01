@@ -4,9 +4,9 @@ import numpy as np
 
 solution_df = pd.read_csv("/home/mithil/PycharmProjects/SenNetKideny/data/kidney_2_solution.csv")
 
-model_dir = "maxvit_small_tf_multiview_15_epoch_5e_04_dice_loss"
+model_dir = "maxvit_small_tf_multiview_15_epoch_5e_04_retry_validation"
 submission_df = pd.read_csv(f"/home/mithil/PycharmProjects/SenNetKideny/models/{model_dir}/oof_csv.csv")
-# submission_df = pd.read_csv(f"/home/mithil/PycharmProjects/SenNetKideny/submission.csv")
+# submission_df = pd.rea    d_csv(f"/home/mithil/PycharmProjects/SenNetKideny/submission.csv")
 # replace sparse with dense
 submission_df['id'] = submission_df['id'].apply(lambda x: x.replace('sparse', 'dense'))
 # only keep the id with are present in solution

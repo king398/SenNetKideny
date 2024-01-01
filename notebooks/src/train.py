@@ -94,8 +94,7 @@ def main(cfg):
     scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=int(len(train_loader) * 8),
                                                                      eta_min=float(cfg['min_lr']))
     (train_loader, valid_loader, model, optimizer, scheduler, train_loader_yz, train_loader_xz,
-     train_loader_2, train_loader_2_xz, train_loader_2_yz) \
-        = accelerate.prepare(
+     train_loader_2, train_loader_2_xz, train_loader_2_yz) = accelerate.prepare(
         train_loader,
         valid_loader,
         model,

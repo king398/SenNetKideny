@@ -156,3 +156,11 @@ def apply_hysteresis_thresholding(volume: np.array, low: float, high: float, chu
         )
 
     return predict
+def norm_with_clip(x,smooth=1e-5):
+    dim=list(range(1,x.ndim))
+    mean=x.mean(dim=dim,keepdim=True)
+    std=x.std(dim=dim,keepdim=True)
+    x=(x-mean)/(std+smooth)
+    x[x>5]=(x[x>5]-5)*1e-3 +5
+    x[x<-3]=(x[x<-3]+3)*1e-3-3
+    return x

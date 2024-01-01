@@ -7,10 +7,10 @@ from tqdm.auto import tqdm
 
 solution_df = pd.read_csv("/home/mithil/PycharmProjects/SenNetKideny/data/kidney_2_solution.csv")
 
-model_dir = "maxvit_small_tf_multiview_15_epoch_5e_04_dice_loss"
+model_dir = "maxvit_small_tf_multiview_15_epoch_5e_04_retry_validation"
 submission_df = pd.read_csv(f"/home/mithil/PycharmProjects/SenNetKideny/models/{model_dir}/oof_csv.csv")
 ids = submission_df['id'].values
-volume = np.load(f"/home/mithil/PycharmProjects/SenNetKideny/models/{model_dir}/oof_volume.npz")['volume'] * 3
+volume = np.load(f"/home/mithil/PycharmProjects/SenNetKideny/models/{model_dir}/oof_volume.npz")['volume']
 thresholds = np.linspace(0.10, 0.9, 9)
 scores = {}
 for threshold in tqdm(thresholds):
