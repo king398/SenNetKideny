@@ -11,6 +11,6 @@ model_name: tu-timm/maxvit_small_tf_224.in1k
 num_workers: 4
 seed: 42
 train_dir: /home/mithil/PycharmProjects/SenNetKideny/data/train/kidney_1_dense
-train_dir_2: /home/mithil/PycharmProjects/SenNetKideny/data/train/kidney_2
+train_dir_2: /home/mithil/PycharmProjects/SenNetKideny/data/train/kidney_3_sparse
 validation_dir: /home/mithil/PycharmProjects/SenNetKideny/data/train/kidney_2
-labels_df : /home/mithil/PycharmProjects/SenNetKideny/data/kidney_2_solution.csv
+labels_df: /home/mithil/PycharmProjects/SenNetKideny/data/kidney_2_solution.csv

@@ -39,7 +39,7 @@ def inference_loop(model: nn.Module, images: torch.Tensor) -> torch.Tensor:
         outputs_batch = model(images, inference=True).sigmoid().detach().cpu().float()
         outputs = outputs_batch
         counter += 1
-        """outputs_batch = model(torch.flip(images, dims=[2, ]), inference=True).sigmoid().detach().cpu().float()
+        outputs_batch = model(torch.flip(images, dims=[2, ]), inference=True).sigmoid().detach().cpu().float()
         outputs += torch.flip(outputs_batch, dims=[2, ])
         counter += 1
         outputs_batch = model(torch.flip(images, dims=[3, ]), inference=True).sigmoid().detach().cpu().float()
@@ -53,7 +53,7 @@ def inference_loop(model: nn.Module, images: torch.Tensor) -> torch.Tensor:
         counter += 1
         outputs_batch = model(torch.rot90(images, k=3, dims=[2, 3]), inference=True).sigmoid().detach().cpu().float()
         outputs += torch.rot90(outputs_batch, k=-3, dims=[2, 3])
-        counter += 1"""
+        counter += 1
 
     outputs /= counter
     outputs = outputs.detach().cpu().float()
@@ -87,7 +87,7 @@ def inference_fn(model: nn.Module, data_loader: DataLoader, data_loader_xz: Data
         gc.collect()
     global_counter = 0
     for i, (images, image_shapes, image_ids) in tqdm(enumerate(data_loader_xz), total=len(data_loader_xz)):
-        break
+
         images = images.to(device, non_blocking=True).float()
         outputs = inference_loop(model, images)
 
@@ -105,7 +105,7 @@ def inference_fn(model: nn.Module, data_loader: DataLoader, data_loader_xz: Data
     gc.collect()
     global_counter = 0
     for i, (images, image_shapes, image_ids) in tqdm(enumerate(data_loader_yz), total=len(data_loader_yz)):
-        break
+
         images = images.to(device, non_blocking=True).float()
         outputs = inference_loop(model, images)
         for j, image in enumerate(outputs):
@@ -140,7 +140,6 @@ def main(cfg: dict):
     model = ReturnModel(cfg['model_name'], cfg['in_channels'], cfg['classes'], )
     model.to(device)
     model.load_state_dict(torch.load(cfg["model_path"], map_location=torch.device('cuda')))
-    model = nn.DataParallel(model)
     valid_rle = pd.read_csv("/home/mithil/PycharmProjects/SenNetKideny/data/kidney_3_dense_full.csv")
     valid_rle['id'] = valid_rle['id'].apply(lambda x: x.replace("kidney_3_dense", "kidney_3_sparse"))
     global_rle_list = []
@@ -186,7 +185,7 @@ config = {
     "in_channels": 3,
     "classes": 2,
     # "test_dir": '/kaggle/input/blood-vessel-segmentation/test',
-    "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/maxvit_small_tf_multiview_15_epoch_5e_04_dice_loss/model.pth",
+    "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/maxvit_small_tf_multiview_15_epoch_5e_04_retry_validation/model.pth",
     "batch_size": 2,
     "num_workers": 8,
 }

@@ -23,6 +23,9 @@ def train_fn(
         train_loader: DataLoader,
         train_loader_xz: DataLoader,
         train_loader_yz: DataLoader,
+        train_loader_2: DataLoader,
+        train_loader_2_xz: DataLoader,
+        train_loader_2_yz: DataLoader,
         model: Module,
         criterion: Module,
         optimizer: optim.Optimizer,
@@ -36,7 +39,8 @@ def train_fn(
     torch.cuda.empty_cache()
     model.train()
     loss_metric = 0
-    combined_loader = CombinedDataLoader(train_loader, train_loader_xz, train_loader_yz)
+    combined_loader = CombinedDataLoader(train_loader, train_loader_xz, train_loader_yz, train_loader_2,
+                                         train_loader_2_xz, train_loader_2_yz)
     stream = tqdm(combined_loader, total=len(combined_loader), disable=not accelerator.is_local_main_process,
                   **tqdm_style)
     for i, (images, masks, image_ids) in enumerate(stream):
