@@ -80,7 +80,7 @@ def validation_fn(
             masks = masks.float()
             images = images.float().to(accelerator.device)
 
-            output = model(images,inference=True )
+            output = model(images, )
             loss = criterion(output, masks)
             outputs, masks, = accelerator.gather((output, masks,))
             image_ids = accelerator.gather_for_metrics(image_ids)

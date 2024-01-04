@@ -453,7 +453,7 @@ class NextViT(nn.Module):
                 if hasattr(m, 'bias') and m.bias is not None:
                     nn.init.constant_(m.bias, 0)
 
-    def forward(self, x):
+    def forward(self, x,inference=True):
         outputs = list()
         outputs.append(x)
         x = self.conv_layer(x)

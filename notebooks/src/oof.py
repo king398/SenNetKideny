@@ -120,7 +120,7 @@ def inference_fn(model: nn.Module, data_loader: DataLoader, data_loader_xz: Data
         del outputs, images
 
     gc.collect()
-    #volume = volume / 3
+    volume = volume / 3
     volume_no_threshold = volume.copy()
     volume = apply_hysteresis_thresholding(volume, 0.2, 0.6)
     #volume = volume > 0.3
