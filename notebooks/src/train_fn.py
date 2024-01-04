@@ -23,9 +23,6 @@ def train_fn(
         train_loader: DataLoader,
         train_loader_xz: DataLoader,
         train_loader_yz: DataLoader,
-        train_loader_2: DataLoader,
-        train_loader_2_xz: DataLoader,
-        train_loader_2_yz: DataLoader,
         model: Module,
         criterion: Module,
         optimizer: optim.Optimizer,
@@ -45,7 +42,6 @@ def train_fn(
     for i, (images, masks, image_ids) in enumerate(stream):
         masks = masks.float()
         images = images.float()
-        images = norm_with_clip(images.reshape(-1, *images.shape[2:]), ).reshape(images.shape)
         output = model(images)
         loss = criterion(output, masks)
         accelerator.backward(loss)
@@ -77,14 +73,14 @@ def validation_fn(
     pd_dataframes = [{"id": [], "rle": []} for _ in range(5)]
     j = 0
     x = 0
-
+    dice_list = []
     with torch.no_grad():
         for i, (images, masks, image_ids) in enumerate(stream):
-            masks = masks.float()
-            images = images.float()
-            images = norm_with_clip(images.reshape(-1, *images.shape[2:]), ).reshape(images.shape)
 
-            output = model(images, )
+            masks = masks.float()
+            images = images.float().to(accelerator.device)
+
+            output = model(images,inference=True )
             loss = criterion(output, masks)
             outputs, masks, = accelerator.gather((output, masks,))
             image_ids = accelerator.gather_for_metrics(image_ids)
@@ -94,6 +90,10 @@ def validation_fn(
             stream.set_description(
                 f"Epoch:{epoch + 1}, valid_loss: {loss_metric:.5f}")
             outputs_not_multiply = outputs_not_multiply.detach().cpu().float().numpy()
+            outputs = outputs[:, 0, :, :] * outputs[:, 1, :, :]
+            dice_batch = dice_valid(outputs, masks[:, 0, :, :])
+            dice_list.append(dice_batch.item())
+
             for p, image, in enumerate(outputs_not_multiply, ):
                 kidney = image[1, :, :]
                 kidney = choose_biggest_object(kidney, 0.5)
@@ -118,9 +118,10 @@ def validation_fn(
         threshold_score_dict.update({f"threshold_{m / 10}": surface_dice})
     max_surface_dice = max(threshold_score_dict.values())
     best_threshold = list(threshold_score_dict.keys())[list(threshold_score_dict.values()).index(max_surface_dice)]
+    dice_score = np.mean(dice_list)
+
     accelerator.print(
-        f"Epoch:{epoch + 1}, valid_loss: {loss_metric:.5f} ,surface_dice: {max_surface_dice:.5f} ,threshold_score_dict   {threshold_score_dict} ")
+        f"Epoch:{epoch + 1}, valid_loss: {loss_metric:.5f} ,Dice Coefficient {dice_score},surface_dice: {max_surface_dice:.5f} ,threshold_score_dict   {threshold_score_dict} ")
     accelerator.log(
         {f"surface_dice": max_surface_dice, f"valid_loss": loss_metric, f"best_threshold": best_threshold, })
-
-    return max_surface_dice
+    return dice_score

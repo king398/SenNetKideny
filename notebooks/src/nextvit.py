@@ -403,6 +403,7 @@ class NextViT(nn.Module):
         if norm_cfg is not None:
             self = torch.nn.SyncBatchNorm.convert_sync_batchnorm(self)
         self._freeze_stages()
+        self.conv_layer = nn.Conv2d(1, 3, kernel_size=1)
 
     def _freeze_stages(self):
         if self.frozen_stages > 0:
@@ -455,6 +456,7 @@ class NextViT(nn.Module):
     def forward(self, x):
         outputs = list()
         outputs.append(x)
+        x = self.conv_layer(x)
 
         xx = self.stem[0](x)
         outputs.append(xx)
@@ -503,7 +505,7 @@ def nextvit_large(pretrained=False, pretrained_cfg=None, **kwargs):
                     **kwargs)
     return model
 
-#model = nextvit_base()
-#x = model(torch.randn(1, 3, 384,384))
-#for i in x:
+# model = nextvit_base()
+# x = model(torch.randn(1, 3, 384,384))
+# for i in x:
 #    print(i.shape)

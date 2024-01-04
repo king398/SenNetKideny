@@ -299,6 +299,15 @@ def inference_fn(model: nn.Module, data_loader: DataLoader, data_loader_xz: Data
 def extract_number(filename):
     match = re.search(r'(\d+)', filename)
     return int(match.group()) if match else None
+def norm_by_percentile(volume, low=10, high=99.8, alpha=0.01):
+    xmin = np.percentile(volume,low)
+    xmax = np.percentile(volume,high)
+    x = (volume-xmin)/(xmax-xmin)
+    if 1:
+        x[x>1]=(x[x>1]-1)*alpha +1
+        x[x<0]=(x[x<0])*alpha
+    #x = np.clip(x,0,1)
+    return x
 
 def main(cfg: dict):
     seed_everything(cfg['seed'])
@@ -316,6 +325,7 @@ def main(cfg: dict):
         test_files = sorted(glob.glob(f"{test_dir}/images/*.tif"))
         print(test_files)
         volume = np.stack([cv2.imread(i, cv2.IMREAD_GRAYSCALE) for i in test_files])
+        volume = norm_by_percentile(volume)
         test_dataset_xy = ImageDataset(test_files, get_valid_transform, mode='xy', volume=volume)
         test_dataset_xz = ImageDataset(test_files, get_valid_transform, mode='xz',
                                        volume=volume)
@@ -346,7 +356,7 @@ config = {
     "in_channels": 3,
     "classes": 2,
     "test_dir": '/kaggle/input/blood-vessel-segmentation/test',
-    "model_path": "/kaggle/input/senet-models/maxvit_small_tf_multiview_15_epoch_5e_04_dice_loss/model.pth",
+    "model_path": "/kaggle/input/senet-models/maxvit_small_tf_multiview_15_epoch_5e_04_dice_loss_normalize/model.pth",
     "batch_size": 2,
     "num_workers": 0,
     "threshold": 0.15,

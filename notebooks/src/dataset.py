@@ -9,19 +9,21 @@ import torch
 
 
 class ImageDataset(Dataset):
-    def __init__(self, image_paths: List[str], mask_paths: List[str], transform: Compose, kidney_rle: List[str]):
+    def __init__(self, image_paths: List[str], mask_paths: List[str], transform: Compose, kidney_rle: List[str],
+                 volume: np.array):
         self.image_paths = image_paths
         self.mask_paths = mask_paths
         self.kidney_rle = kidney_rle
         self.transform = transform
+        self.volume = volume
 
     def __len__(self) -> int:
         return len(self.image_paths)
 
     def __getitem__(self, item) -> Tuple[torch.Tensor, torch.Tensor, str]:
-        image = cv2.imread(self.image_paths[item])
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        #image = (image - image.min()) / (image.max() - image.min() + 0.0001)
+        image = self.volume[item].astype(np.float32)
+        image = (image - image.min()) / (image.max() - image.min() + 0.0001)
+        #image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
         mask = cv2.imread(self.mask_paths[item])
         mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
         mask = mask / 255
@@ -77,7 +79,7 @@ class ImageDatasetOOF(Dataset):
 
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         image = image.astype("float")
-        #image = (image - image.min()) / (image.max() - image.min() + 0.0001)
+        # image = (image - image.min()) / (image.max() - image.min() + 0.0001)
         image = self.transform(image=image)
         return image, image_shape, image_id
 

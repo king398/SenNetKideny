@@ -18,7 +18,6 @@ class ReturnModel(nn.Module):
             in_channels=in_channels,
             classes=classes,
         )
-        self.upsample = nn.UpsamplingBilinear2d(scale_factor=1)
         # if not inference:
         #    self.unet.encoder.model.set_grad_checkpointing(True)
         self.inference = inference
@@ -29,11 +28,14 @@ class ReturnModel(nn.Module):
         x, pad = self._pad_image(x)
 
         # Forward pass through Unet
-        x = checkpoint(self.unet.encoder, x, )
+        if inference:
+            x = self.unet.encoder(x)
+        else:
+            x = checkpoint(self.unet.encoder, x, )
+
 
         x = self.unet.decoder(*x)
         x = self.unet.segmentation_head(x)
-        x  = self.upsample(x)
         # Remove padding
         x = self._unpad(x, original_size, pad)
 
