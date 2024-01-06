@@ -5,9 +5,9 @@ from notebooks.src.utils import rle_encode
 import matplotlib.pyplot as plt
 from tqdm.auto import tqdm
 
-solution_df = pd.read_csv("/home/mithil/PycharmProjects/SenNetKideny/data/kidney_2_solution.csv")
+solution_df = pd.read_csv("/home/mithil/PycharmProjects/SenNetKideny/data/kidney_3_dense_full.csv")
 
-model_dir = "maxvit_small_tf_multiview_15_epoch_5e_04_retry_validation"
+model_dir = "seresnextaa101d_32x8d_multiview_30_epoch_5e_04_dice_loss_normalize"
 submission_df = pd.read_csv(f"/home/mithil/PycharmProjects/SenNetKideny/models/{model_dir}/oof_csv.csv")
 ids = submission_df['id'].values
 volume = np.load(f"/home/mithil/PycharmProjects/SenNetKideny/models/{model_dir}/oof_volume.npz")['volume']

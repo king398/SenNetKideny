@@ -39,20 +39,23 @@ def train_fn(
     combined_loader = CombinedDataLoader(train_loader, train_loader_xz, train_loader_yz, )
     stream = tqdm(combined_loader, total=len(combined_loader), disable=not accelerator.is_local_main_process,
                   **tqdm_style)
+
     for i, (images, masks, image_ids) in enumerate(stream):
         masks = masks.float()
         images = images.float()
         output = model(images)
         loss = criterion(output, masks)
         accelerator.backward(loss)
-        optimizer.step()
-        optimizer.zero_grad()
+        if (i+1) % 4 == 0:
+            optimizer.step()
+            optimizer.zero_grad()
+            scheduler.step()
         outputs, masks = accelerator.gather_for_metrics((output, masks))
         loss_metric += loss.item() / (i + 1)
         dice_batch = dice(outputs, masks)
         stream.set_description(
             f"Epoch:{epoch + 1}, train_loss: {loss_metric:.5f}, dice_batch: {dice_batch.item():.5f}")
-        scheduler.step()
+
         accelerator.log({f"train_loss_{fold}": loss_metric, f"train_dice_batch_{fold}": dice_batch.item(),
                          f"lr_{fold}": optimizer.param_groups[0]['lr']})
 

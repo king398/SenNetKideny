@@ -36,22 +36,22 @@ def inference_loop(model: nn.Module, images: torch.Tensor) -> torch.Tensor:
     outputs = None
     counter = 0
     with torch.no_grad() and autocast():
-        outputs_batch = model(images, inference=True).sigmoid().detach().cpu().float()
+        outputs_batch = model(images, inference=False).sigmoid().detach().cpu().float()
         outputs = outputs_batch
         counter += 1
-        outputs_batch = model(torch.flip(images, dims=[2, ]), inference=True).sigmoid().detach().cpu().float()
+        outputs_batch = model(torch.flip(images, dims=[2, ]), inference=False).sigmoid().detach().cpu().float()
         outputs += torch.flip(outputs_batch, dims=[2, ])
         counter += 1
-        outputs_batch = model(torch.flip(images, dims=[3, ]), inference=True).sigmoid().detach().cpu().float()
+        outputs_batch = model(torch.flip(images, dims=[3, ]), inference=False).sigmoid().detach().cpu().float()
         outputs += torch.flip(outputs_batch, dims=[3, ])
         counter += 1
-        outputs_batch = model(torch.rot90(images, k=1, dims=[2, 3]), inference=True).sigmoid().detach().cpu().float()
+        outputs_batch = model(torch.rot90(images, k=1, dims=[2, 3]), inference=False).sigmoid().detach().cpu().float()
         outputs += torch.rot90(outputs_batch, k=-1, dims=[2, 3])
         counter += 1
-        outputs_batch = model(torch.rot90(images, k=2, dims=[2, 3]), inference=True).sigmoid().detach().cpu().float()
+        outputs_batch = model(torch.rot90(images, k=2, dims=[2, 3]), inference=False).sigmoid().detach().cpu().float()
         outputs += torch.rot90(outputs_batch, k=-2, dims=[2, 3])
         counter += 1
-        outputs_batch = model(torch.rot90(images, k=3, dims=[2, 3]), inference=True).sigmoid().detach().cpu().float()
+        outputs_batch = model(torch.rot90(images, k=3, dims=[2, 3]), inference=False).sigmoid().detach().cpu().float()
         outputs += torch.rot90(outputs_batch, k=-3, dims=[2, 3])
         counter += 1
 
@@ -123,7 +123,7 @@ def inference_fn(model: nn.Module, data_loader: DataLoader, data_loader_xz: Data
     volume = volume / 3
     volume_no_threshold = volume.copy()
     volume = apply_hysteresis_thresholding(volume, 0.2, 0.6)
-    #volume = volume > 0.3
+    # volume = volume > 0.3
     volume = (volume * 255).astype(np.uint8)
     for output_mask in volume:
         rles_list.append(rle_encode(output_mask))
@@ -136,7 +136,7 @@ def main(cfg: dict):
     global volume_uncompressed
     seed_everything(cfg['seed'])
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    test_dirs = ["/home/mithil/PycharmProjects/SenNetKideny/data/train/kidney_2", ]
+    test_dirs = ["/home/mithil/PycharmProjects/SenNetKideny/data/train/kidney_3_dense", ]
     model = ReturnModel(cfg['model_name'], cfg['in_channels'], cfg['classes'], )
     model.to(device)
     model.load_state_dict(torch.load(cfg["model_path"], map_location=torch.device('cuda')))
@@ -148,7 +148,8 @@ def main(cfg: dict):
     for test_dir in test_dirs:
         test_files = sorted(glob.glob(f"{test_dir}/images/*.tif"))
 
-        volume = np.stack([cv2.imread(i) for i in test_files])
+        volume = np.stack([cv2.imread(i, cv2.IMREAD_GRAYSCALE) for i in test_files])
+        volume = norm_by_percentile(volume)
         test_dataset_xy = ImageDatasetOOF(test_files, get_valid_transform, mode='xy', volume=volume)
         test_dataset_xz = ImageDatasetOOF(test_files, get_valid_transform, mode='xz',
                                           volume=volume)
@@ -181,11 +182,11 @@ def main(cfg: dict):
 
 config = {
     "seed": 42,
-    "model_name": "tu-timm/maxvit_small_tf_224.in1k",
+    "model_name": "tu-timm/seresnext101d_32x8d.ah_in1k",
     "in_channels": 3,
     "classes": 2,
     # "test_dir": '/kaggle/input/blood-vessel-segmentation/test',
-    "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/maxvit_small_tf_multiview_15_epoch_5e_04_retry_validation/model.pth",
+    "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/seresnextaa101d_32x8d_multiview_30_epoch_5e_04_dice_loss_normalize/model.pth",
     "batch_size": 2,
     "num_workers": 8,
 }

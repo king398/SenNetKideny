@@ -15,7 +15,7 @@ class ReturnModel(nn.Module):
         self.unet = smp.Unet(
             encoder_name=model_name,
             encoder_weights="imagenet",
-            in_channels=in_channels,
+            in_channels=1,
             classes=classes,
         )
         # if not inference:
