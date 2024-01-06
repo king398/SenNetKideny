@@ -33,7 +33,7 @@ print(f"Best Score: {scores[best_threshold]}")
 plt.plot(list(scores.keys()), list(scores.values()))
 plt.xlabel("Threshold")
 plt.ylabel("Score")
-
+plt.show()
 with open(f"/home/mithil/PycharmProjects/SenNetKideny/models/{model_dir}/config.yaml") as f:
     cfg = yaml.load(f, Loader=yaml.FullLoader)
 cfg['score'] = float(scores[best_threshold])

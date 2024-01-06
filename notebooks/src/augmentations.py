@@ -4,7 +4,7 @@ from albumentations.pytorch import ToTensorV2
 
 def get_train_transform(height: int = 1344, width: int = 1120) -> Compose:
     return Compose([
-        # RandomBrightnessContrast(p=0.05,),
+        #RandomBrightnessContrast(p=0.05,),
         HorizontalFlip(p=0.5),
         ToTensorV2(transpose_mask=True), ])
 

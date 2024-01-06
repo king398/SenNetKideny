@@ -15,11 +15,10 @@ class ReturnModel(nn.Module):
         self.unet = smp.Unet(
             encoder_name=model_name,
             encoder_weights="imagenet",
-            in_channels=1,
+            in_channels=in_channels,
             classes=classes,
+            decoder_attention_type="scse"
         )
-        # if not inference:
-        #    self.unet.encoder.model.set_grad_checkpointing(True)
         self.inference = inference
 
     def forward(self, x, inference: bool = False):

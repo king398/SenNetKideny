@@ -41,8 +41,8 @@ def train_fn(
                   **tqdm_style)
 
     for i, (images, masks, image_ids) in enumerate(stream):
-        masks = masks.float()
-        images = images.float()
+        masks = masks.float().contiguous()
+        images = images.float().contiguous()
         output = model(images)
         loss = criterion(output, masks)
         accelerator.backward(loss)
