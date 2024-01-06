@@ -46,7 +46,7 @@ def train_fn(
         output = model(images)
         loss = criterion(output, masks)
         accelerator.backward(loss)
-        if (i+1) % 4 == 0:
+        if (i+1) % 1 == 0:
             optimizer.step()
             optimizer.zero_grad()
             scheduler.step()

@@ -49,22 +49,19 @@ def main(cfg):
     validation_masks = list(map(lambda x: x.replace("images", "labels"), validation_images))
     train_xz_kidneys_rle = list(map(lambda x: kidney_rle[f"kidney_1_dense_xz_{x.split('.')[0]}"], train_images_xz))
     train_images_xz = list(map(lambda x: f"{cfg['train_dir']}_xz/images/{x}", train_images_xz))
-    train_volume_xz = np.stack([cv2.imread(i, cv2.IMREAD_GRAYSCALE).astype(np.float16) for i in tqdm(train_images_xz)])
-    train_volume_xz = norm_by_percentile(train_volume_xz)
     train_masks_xz = list(map(lambda x: x.replace("images", "labels"), train_images_xz))
     train_yz_kidneys_rle = list(map(lambda x: kidney_rle[f"kidney_1_dense_yz_{x.split('.')[0]}"], train_images_yz))
     train_images_yz = list(map(lambda x: f"{cfg['train_dir']}_yz/images/{x}", train_images_yz))
     train_masks_yz = list(map(lambda x: x.replace("images", "labels"), train_images_yz))
-    train_volume_yz = np.stack([cv2.imread(i, cv2.IMREAD_GRAYSCALE).astype(np.float16) for i in tqdm(train_images_yz)])
-    train_volume_yz = norm_by_percentile(train_volume_yz)
 
-    train_dataset = ImageDataset(train_images, train_masks, get_train_transform(), train_kidneys_rle, train_volume)
+    train_dataset = ImageDataset(train_images, train_masks, get_train_transform(), train_kidneys_rle, train_volume,
+                                 mode="xy")
     valid_dataset = ImageDataset(validation_images, validation_masks, get_valid_transform(),
-                                 validation_kidneys_rle, validation_volume)
+                                 validation_kidneys_rle, validation_volume, mode="xy")
     train_dataset_xz = ImageDataset(train_images_xz, train_masks_xz, get_train_transform(),
-                                    train_xz_kidneys_rle, train_volume_xz)
+                                    train_xz_kidneys_rle, train_volume, mode="xz")
     train_dataset_yz = ImageDataset(train_images_yz, train_masks_yz, get_train_transform(),
-                                    train_yz_kidneys_rle, train_volume_yz)
+                                    train_yz_kidneys_rle, train_volume, mode="yz")
     train_loader = DataLoader(train_dataset, batch_size=cfg['batch_size'], shuffle=True, num_workers=cfg['num_workers'],
                               pin_memory=True)
 

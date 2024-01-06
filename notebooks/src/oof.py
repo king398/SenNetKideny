@@ -182,11 +182,11 @@ def main(cfg: dict):
 
 config = {
     "seed": 42,
-    "model_name": "tu-timm/seresnext101d_32x8d.ah_in1k",
+    "model_name": "tu-timm/seresnext50_32x4d.gluon_in1k",
     "in_channels": 3,
     "classes": 2,
     # "test_dir": '/kaggle/input/blood-vessel-segmentation/test',
-    "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/seresnextaa101d_32x8d_multiview_30_epoch_5e_04_dice_loss_normalize/model.pth",
+    "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/seresnext50_multiview_30_epoch_5e_04_dice_loss_normalize_hflip/model.pth",
     "batch_size": 2,
     "num_workers": 8,
 }

@@ -4,14 +4,15 @@ import numpy as np
 from notebooks.src.utils import rle_encode
 import matplotlib.pyplot as plt
 from tqdm.auto import tqdm
+import yaml
 
 solution_df = pd.read_csv("/home/mithil/PycharmProjects/SenNetKideny/data/kidney_3_dense_full.csv")
 
-model_dir = "seresnextaa101d_32x8d_multiview_30_epoch_5e_04_dice_loss_normalize"
+model_dir = "seresnext50_multiview_30_epoch_5e_04_dice_loss_normalize_hflip"
 submission_df = pd.read_csv(f"/home/mithil/PycharmProjects/SenNetKideny/models/{model_dir}/oof_csv.csv")
 ids = submission_df['id'].values
 volume = np.load(f"/home/mithil/PycharmProjects/SenNetKideny/models/{model_dir}/oof_volume.npz")['volume']
-thresholds = np.linspace(0.10, 0.9, 9)
+thresholds = np.linspace(0.10, 0.5, 9)
 scores = {}
 for threshold in tqdm(thresholds):
     volume_threshold = (volume > threshold).astype(np.uint8)
@@ -32,3 +33,10 @@ print(f"Best Score: {scores[best_threshold]}")
 plt.plot(list(scores.keys()), list(scores.values()))
 plt.xlabel("Threshold")
 plt.ylabel("Score")
+
+with open(f"/home/mithil/PycharmProjects/SenNetKideny/models/{model_dir}/config.yaml") as f:
+    cfg = yaml.load(f, Loader=yaml.FullLoader)
+cfg['score'] = float(scores[best_threshold])
+cfg['best_threshold'] = float(best_threshold)
+with open(f"/home/mithil/PycharmProjects/SenNetKideny/models/{model_dir}/config.yaml", 'w') as f:
+    yaml.dump(cfg, f, )

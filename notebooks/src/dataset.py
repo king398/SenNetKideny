@@ -10,19 +10,36 @@ import torch
 
 class ImageDataset(Dataset):
     def __init__(self, image_paths: List[str], mask_paths: List[str], transform: Compose, kidney_rle: List[str],
-                 volume: np.array):
+                 volume: np.array, mode: Literal["xy", "yz", "xz"] = "xy",):
         self.image_paths = image_paths
         self.mask_paths = mask_paths
         self.kidney_rle = kidney_rle
         self.transform = transform
         self.volume = volume
+        self.mode = mode
 
     def __len__(self) -> int:
-        return len(self.image_paths)
+        match self.mode:
+            case "xy":
+                return self.volume.shape[0]
+            case "xz":
+                return self.volume.shape[1]
+            case "yz":
+                return self.volume.shape[2]
+
+
 
     def __getitem__(self, item) -> Tuple[torch.Tensor, torch.Tensor, str]:
-        image = self.volume[item].astype(np.float32)
-        image = (image - image.min()) / (image.max() - image.min() + 0.0001)
+        match self.mode:
+            case "xy":
+                image = self.volume[item].astype(np.float32)
+            case "xz":
+                image = self.volume[:, item].astype(np.float32)
+            case "yz":
+                image = self.volume[:, :, item].astype(np.float32)
+            case _:
+                raise ValueError("Invalid mode")
+        #image = (image - image.min()) / (image.max() - image.min() + 0.0001)
         #image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
         mask = cv2.imread(self.mask_paths[item])
         mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
