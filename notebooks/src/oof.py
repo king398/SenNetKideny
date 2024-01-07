@@ -149,7 +149,7 @@ def main(cfg: dict):
         test_files = sorted(glob.glob(f"{test_dir}/images/*.tif"))
 
         volume = np.stack([cv2.imread(i, cv2.IMREAD_GRAYSCALE) for i in test_files])
-        volume = norm_by_percentile(volume)
+        volume = norm_by_percentile(volume).astype(np.float32)
         test_dataset_xy = ImageDatasetOOF(test_files, get_valid_transform, mode='xy', volume=volume)
         test_dataset_xz = ImageDatasetOOF(test_files, get_valid_transform, mode='xz',
                                           volume=volume)
@@ -182,12 +182,12 @@ def main(cfg: dict):
 
 config = {
     "seed": 42,
-    "model_name": "tu-timm/seresnext50_32x4d.gluon_in1k",
+    "model_name": "tu-timm/maxvit_base_tf_224.in1k",
     "in_channels": 3,
     "classes": 2,
     # "test_dir": '/kaggle/input/blood-vessel-segmentation/test',
-    "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/seresnext50_multiview_30_epoch_5e_04_dice_loss_normalize_hflip_3_channels/model.pth",
-    "batch_size": 2,
+    "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/maxvit_base_tf_multiview_15_epoch_5e_04_dice_loss_normalize_hflip/model.pth",
+    "batch_size": 1,
     "num_workers": 8,
 }
 if __name__ == "__main__":

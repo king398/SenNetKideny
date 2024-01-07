@@ -8,7 +8,7 @@ import yaml
 
 solution_df = pd.read_csv("/home/mithil/PycharmProjects/SenNetKideny/data/kidney_3_dense_full.csv")
 
-model_dir = "seresnext50_multiview_30_epoch_5e_04_dice_loss_normalize_hflip"
+model_dir = "seresnext50_multiview_30_epoch_5e_04_dice_loss_normalize_hflip_3_channels"
 submission_df = pd.read_csv(f"/home/mithil/PycharmProjects/SenNetKideny/models/{model_dir}/oof_csv.csv")
 ids = submission_df['id'].values
 volume = np.load(f"/home/mithil/PycharmProjects/SenNetKideny/models/{model_dir}/oof_volume.npz")['volume']

@@ -19,7 +19,6 @@ from segmentation_models_pytorch.losses import DiceLoss
 import cv2
 from tqdm import tqdm
 
-
 def main(cfg):
     warnings.filterwarnings("ignore")
     seed_everything(cfg['seed'])
@@ -72,9 +71,8 @@ def main(cfg):
     valid_loader = DataLoader(valid_dataset, batch_size=cfg['batch_size'], shuffle=False,
                               num_workers=cfg['num_workers'], pin_memory=True)
 
-    # else:
-    model = ReturnModel(cfg['model_name'], in_channels=cfg['in_channels'], classes=cfg['classes'])
-    #model = torch.compile(model)
+    model = ReturnModel(cfg['model_name'], in_channels=cfg['in_channels'], classes=cfg['classes'],
+                        pad_factor=cfg['pad_factor'], )
     optimizer = torch.optim.AdamW(model.parameters(), lr=float(cfg['lr']))
     scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=int(
         (len(train_loader) + len(train_loader_yz) + len(train_loader_xz)) * 10),
@@ -127,7 +125,6 @@ def main(cfg):
             model_weights[new_key] = v
         if dice_score > best_dice:
             best_dice = dice_score
-
 
             accelerate.save(model_weights, f"{cfg['model_dir']}/model.pth")
         accelerate.save(model_weights, f"{cfg['model_dir']}/model_last_epoch.pth")

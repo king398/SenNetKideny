@@ -70,7 +70,7 @@ def rle_encode(mask: np.array) -> str:
     return rle
 
 
-def get_valid_transform(image: np.array, original_height: int, original_width: int,pad_factor:int=224) -> np.array:
+def get_valid_transform(image: np.array, original_height: int, original_width: int,pad_factor:int=32) -> np.array:
     """
     Crops the padded image back to its original dimensions.
 
@@ -80,7 +80,7 @@ def get_valid_transform(image: np.array, original_height: int, original_width: i
     :return: Cropped image with original dimensions.
     """
     # Define the cropping transformation
-    # round up original height and width to nearest 32
+    # round up original height and width to nearest pad_factor
     original_height = int(np.ceil(original_height / pad_factor) * pad_factor)
     original_width = int(np.ceil(original_width / pad_factor) * pad_factor)
     transform = Compose([
@@ -124,11 +124,11 @@ class ImageDataset(Dataset):
     def __getitem__(self, item) -> tuple[torch.Tensor, Tuple, str]:
         match self.mode:
             case "xy":
-                image = self.volume[item]
+                image = self.volume[item].astype(np.float32)
             case "xz":
-                image = self.volume[:, item]
+                image = self.volume[:, item].astype(np.float32)
             case "yz":
-                image = self.volume[:, :, item]
+                image = self.volume[:, :, item].astype(np.float32)
             case _:
                 raise ValueError("Invalid mode")
 
@@ -138,12 +138,11 @@ class ImageDataset(Dataset):
         else:
             image_id = "Na"
             folder_id = "Na"
-
+        image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
         image_id = f"{folder_id}_{image_id}"
         image_shape = image.shape
         image_shape = tuple(str(element) for element in image_shape)
 
-        image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
         image = (image - image.min()) / (image.max() - image.min() + 0.0001)
         image = self.transform(image=image, original_height=int(image_shape[0]), original_width=int(image_shape[1]))
         return image, image_shape, image_id
@@ -288,7 +287,7 @@ def inference_fn(model: nn.Module, data_loader: DataLoader, data_loader_xz: Data
     volume = volume / 3
     #volume = apply_hysteresis_thresholding(volume, 0.2, 0.6)
 
-    volume = volume > 0.3
+    volume = volume > 0.2
     volume = (volume * 255).astype(np.uint8)
     for output_mask in volume:
         rles_list.append(rle_encode(output_mask))
@@ -324,8 +323,9 @@ def main(cfg: dict):
     for test_dir in test_dirs:
         test_files = sorted(glob.glob(f"{test_dir}/images/*.tif"))
         print(test_files)
-        volume = np.stack([cv2.imread(i, cv2.IMREAD_GRAYSCALE) for i in test_files])
+        volume = np.stack([cv2.imread(i, cv2.IMREAD_GRAYSCALE).astype(np.float16) for i in test_files])
         volume = norm_by_percentile(volume)
+        print(volume.shape)
         test_dataset_xy = ImageDataset(test_files, get_valid_transform, mode='xy', volume=volume)
         test_dataset_xz = ImageDataset(test_files, get_valid_transform, mode='xz',
                                        volume=volume)
@@ -352,12 +352,12 @@ def main(cfg: dict):
 
 config = {
     "seed": 42,
-    "model_name": "tu-timm/maxvit_small_tf_224.in1k",
+    "model_name": "tu-timm/seresnext50_32x4d.gluon_in1k",
     "in_channels": 3,
     "classes": 2,
     "test_dir": '/kaggle/input/blood-vessel-segmentation/test',
-    "model_path": "/kaggle/input/senet-models/maxvit_small_tf_multiview_15_epoch_5e_04_dice_loss_normalize/model.pth",
-    "batch_size": 2,
+    "model_path": "/kaggle/input/senet-models/seresnext50_multiview_30_epoch_5e_04_dice_loss_normalize_hflip_3_channels.csv/model.pth",
+    "batch_size": 4,
     "num_workers": 0,
     "threshold": 0.15,
 }

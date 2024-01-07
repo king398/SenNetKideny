@@ -3,3 +3,5 @@
 /701.png
 /logs/
 /models
+/wandb
+*.csv

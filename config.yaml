@@ -7,10 +7,11 @@ kidneys_df: /home/mithil/PycharmProjects/SenNetKideny/data/train_rles_kidneys.cs
 labels_df: /home/mithil/PycharmProjects/SenNetKideny/data/kidney_3_dense_full_self_encode.csv
 lr: 5e-04
 min_lr: 3e-05
-model_dir: /home/mithil/PycharmProjects/SenNetKideny/models/maxvit_base_tf_multiview_15_epoch_5e_04_dice_loss_normalize_hflip
-model_name: tu-timm/maxvit_base_tf_224.in1k
+model_dir: /home/mithil/PycharmProjects/SenNetKideny/models/maxvit_small_25_epoch_5e_04_dice_loss_normalize_hflip
+model_name: tu-timm/maxvit_small_tf_224.in1k
 num_workers: 4
 seed: 42
 train_dir: /home/mithil/PycharmProjects/SenNetKideny/data/train/kidney_1_dense
 train_dir_2: /home/mithil/PycharmProjects/SenNetKideny/data/train/kidney_2
 validation_dir: /home/mithil/PycharmProjects/SenNetKideny/data/train/kidney_3_dense
+pad_factor : 224

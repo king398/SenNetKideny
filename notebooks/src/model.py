@@ -8,8 +8,9 @@ from torch import nn
 import torch
 from torch.nn import functional as F
 
+
 class ReturnModel(nn.Module):
-    def __init__(self, model_name: str, in_channels: int, classes: int, inference: bool = False):
+    def __init__(self, model_name: str, in_channels: int, classes: int, pad_factor: int):
         super(ReturnModel, self).__init__()
         # Initialize the Unet model
         self.unet = smp.Unet(
@@ -18,26 +19,27 @@ class ReturnModel(nn.Module):
             in_channels=in_channels,
             classes=classes,
         )
+        self.pad_factor = pad_factor
 
     def forward(self, x, inference: bool = False):
-            # Pad the input
-            original_size = x.shape[2:]
-            x, pad = self._pad_image(x)
-            #x = F.interpolate(x, scale_factor=2, mode='bilinear', align_corners=True)
+        # Pad the input
+        original_size = x.shape[2:]
+        x, pad = self._pad_image(x, pad_factor=self.pad_factor)
+        # x = F.interpolate(x, scale_factor=2, mode='bilinear', align_corners=True)
 
-            # Forward pass through Unet
-            if inference:
-                x = self.unet.encoder(x)
-            else:
-                x = checkpoint(self.unet.encoder, x, )
+        # Forward pass through Unet
+        if inference:
+            x = self.unet.encoder(x)
+        else:
+            x = checkpoint(self.unet.encoder, x, )
 
-            x = self.unet.decoder(*x)
-            x = self.unet.segmentation_head(x)
-            #x = F.interpolate(x, scale_factor=0.5, mode='bilinear', align_corners=True)
-            # Remove padding
-            x = self._unpad(x, original_size, pad)
+        x = self.unet.decoder(*x)
+        x = self.unet.segmentation_head(x)
+        # x = F.interpolate(x, scale_factor=0.5, mode='bilinear', align_corners=True)
+        # Remove padding
+        x = self._unpad(x, original_size, pad)
 
-            return x
+        return x
 
     def _pad_image(self, x: torch.Tensor, pad_factor: int = 224):
         h, w = x.shape[2], x.shape[3]

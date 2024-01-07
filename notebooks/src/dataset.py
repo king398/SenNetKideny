@@ -94,7 +94,7 @@ class ImageDatasetOOF(Dataset):
         image_shape = image.shape
         image_shape = tuple(str(element) for element in image_shape)
 
-        #image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
         image = image.astype("float")
         image = (image - image.min()) / (image.max() - image.min() + 0.0001)
         image = self.transform(image=image)
