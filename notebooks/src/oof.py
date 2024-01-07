@@ -186,7 +186,7 @@ config = {
     "in_channels": 3,
     "classes": 2,
     # "test_dir": '/kaggle/input/blood-vessel-segmentation/test',
-    "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/seresnext50_multiview_30_epoch_5e_04_dice_loss_normalize_hflip/model.pth",
+    "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/seresnext50_multiview_30_epoch_5e_04_dice_loss_normalize_hflip_3_channels/model.pth",
     "batch_size": 2,
     "num_workers": 8,
 }
