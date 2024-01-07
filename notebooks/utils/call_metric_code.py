@@ -4,7 +4,7 @@ import numpy as np
 
 solution_df = pd.read_csv("/home/mithil/PycharmProjects/SenNetKideny/data/kidney_3_dense_full.csv")
 
-model_dir = "seresnext50_multiview_30_epoch_5e_04_dice_loss_normalize_hflip"
+model_dir = "maxvit_small_25_epoch_5e_04_dice_loss_normalize_hflip"
 submission_df = pd.read_csv(f"/home/mithil/PycharmProjects/SenNetKideny/models/{model_dir}/oof_csv.csv")
 # submission_df = pd.rea    d_csv(f"/home/mithil/PycharmProjects/SenNetKideny/submission.csv")
 # replace sparse with dense

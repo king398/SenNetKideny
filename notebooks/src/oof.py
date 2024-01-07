@@ -137,7 +137,7 @@ def main(cfg: dict):
     seed_everything(cfg['seed'])
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     test_dirs = ["/home/mithil/PycharmProjects/SenNetKideny/data/train/kidney_3_dense", ]
-    model = ReturnModel(cfg['model_name'], cfg['in_channels'], cfg['classes'], )
+    model = ReturnModel(cfg['model_name'], cfg['in_channels'], cfg['classes'], cfg['pad_factor'])
     model.to(device)
     model.load_state_dict(torch.load(cfg["model_path"], map_location=torch.device('cuda')))
     valid_rle = pd.read_csv("/home/mithil/PycharmProjects/SenNetKideny/data/kidney_3_dense_full.csv")
@@ -182,13 +182,14 @@ def main(cfg: dict):
 
 config = {
     "seed": 42,
-    "model_name": "tu-timm/maxvit_base_tf_224.in1k",
+    "model_name": "tu-timm/maxvit_small_tf_224.in1k",
     "in_channels": 3,
     "classes": 2,
     # "test_dir": '/kaggle/input/blood-vessel-segmentation/test',
-    "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/maxvit_base_tf_multiview_15_epoch_5e_04_dice_loss_normalize_hflip/model.pth",
+    "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/maxvit_small_25_epoch_5e_04_dice_loss_normalize_hflip/model.pth",
     "batch_size": 1,
     "num_workers": 8,
+    "pad_factor": 224,
 }
 if __name__ == "__main__":
     main(config)

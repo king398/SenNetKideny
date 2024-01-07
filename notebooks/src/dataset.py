@@ -39,7 +39,7 @@ class ImageDataset(Dataset):
                 image = self.volume[:, :, item].astype(np.float32)
             case _:
                 raise ValueError("Invalid mode")
-        image = (image - image.min()) / (image.max() - image.min() + 0.0001)
+        #image = (image - image.min()) / (image.max() - image.min() + 0.0001)
         image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
         mask = cv2.imread(self.mask_paths[item])
         mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)

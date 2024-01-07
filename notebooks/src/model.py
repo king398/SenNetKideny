@@ -113,7 +113,7 @@ class ReturnModelDepth6(nn.Module):
 
 
 class ReturnModelNextVit(nn.Module):
-    def __init__(self, model_name: str, in_channels: int, classes: int, inference: bool = False):
+    def __init__(self, model_name: str, in_channels: int, classes: int, pad_factor: int):
         super(ReturnModelNextVit, self).__init__()
         # Initialize the Unet model
         if not model_name.startswith("nextvit"):
@@ -134,10 +134,11 @@ class ReturnModelNextVit(nn.Module):
             activation=None,
             kernel_size=3,
         )
+        self.pad_factor = pad_factor
 
     def forward(self, x):
         original_size = x.shape[2:]
-        x, pad = self._pad_image(x)
+        x, pad = self._pad_image(x, pad_factor=self.pad_factor)
         features = checkpoint(self.encoder, x)
         x = self.decoder(*features)
         x = self.segmentation_head(x)
