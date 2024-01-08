@@ -46,10 +46,9 @@ def train_fn(
         output = model(images)
         loss = criterion(output, masks)
         accelerator.backward(loss)
-        if (i+1) % 1 == 0:
-            optimizer.step()
-            optimizer.zero_grad()
-            scheduler.step()
+        optimizer.step()
+        optimizer.zero_grad()
+        #scheduler.step()
         outputs, masks = accelerator.gather_for_metrics((output, masks))
         loss_metric += loss.item() / (i + 1)
         dice_batch = dice(outputs, masks)
@@ -127,4 +126,4 @@ def validation_fn(
         f"Epoch:{epoch + 1}, valid_loss: {loss_metric:.5f} ,Dice Coefficient {dice_score},surface_dice: {max_surface_dice:.5f} ,threshold_score_dict   {threshold_score_dict} ")
     accelerator.log(
         {f"surface_dice": max_surface_dice, f"valid_loss": loss_metric, f"best_threshold": best_threshold, })
-    return dice_score
+    return dice_score,max_surface_dice

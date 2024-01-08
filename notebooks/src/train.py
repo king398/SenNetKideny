@@ -19,6 +19,7 @@ from segmentation_models_pytorch.losses import DiceLoss
 import cv2
 from tqdm import tqdm
 
+
 def main(cfg):
     warnings.filterwarnings("ignore")
     seed_everything(cfg['seed'])
@@ -87,6 +88,7 @@ def main(cfg):
 
     criterion = DiceLoss(mode="multilabel")
     best_dice = -1
+    best_surface_dice = -1
     # remove all the rows which do not contain kidney_3_dense in the id column
     labels_df = pd.read_csv(cfg['labels_df'])
 
@@ -106,7 +108,7 @@ def main(cfg):
 
         )
 
-        dice_score = validation_fn(
+        dice_score, surface_dice = validation_fn(
             valid_loader=valid_loader,
             model=model,
             criterion=criterion,
@@ -127,6 +129,13 @@ def main(cfg):
             best_dice = dice_score
 
             accelerate.save(model_weights, f"{cfg['model_dir']}/model.pth")
+            accelerate.print(f"Saved Model With Best Dice Score {best_dice}")
+        if surface_dice > best_surface_dice:
+            best_surface_dice = surface_dice
+            accelerate.save(model_weights, f"{cfg['model_dir']}/model_best_surface_dice.pth")
+            accelerate.print(f"Saved Model With Best Surface Dice Score {best_surface_dice}")
+        if epoch % 12 == 0:
+            accelerate.save(model_weights, f"{cfg['model_dir']}/model_epoch_{epoch}.pth")
         accelerate.save(model_weights, f"{cfg['model_dir']}/model_last_epoch.pth")
     accelerate.end_training()
 
