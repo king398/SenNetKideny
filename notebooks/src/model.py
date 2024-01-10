@@ -25,20 +25,11 @@ class ReturnModel(nn.Module):
         # Pad the input
         original_size = x.shape[2:]
         x, pad = self._pad_image(x, pad_factor=self.pad_factor)
-        # x = F.interpolate(x, scale_factor=2, mode='bilinear', align_corners=True)
-
-        # Forward pass through Unet
-        if inference:
-            x = self.unet.encoder(x)
-        else:
-            x = checkpoint(self.unet.encoder, x, )
+        x = checkpoint(self.unet.encoder, x)
 
         x = self.unet.decoder(*x)
         x = self.unet.segmentation_head(x)
-        # x = F.interpolate(x, scale_factor=0.5, mode='bilinear', align_corners=True)
-        # Remove padding
         x = self._unpad(x, original_size, pad)
-
         return x
 
     def _pad_image(self, x: torch.Tensor, pad_factor: int = 224):

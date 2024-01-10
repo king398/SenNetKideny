@@ -75,9 +75,9 @@ def main(cfg):
     model = ReturnModel(cfg['model_name'], in_channels=cfg['in_channels'], classes=cfg['classes'],
                         pad_factor=cfg['pad_factor'], )
     optimizer = torch.optim.AdamW(model.parameters(), lr=float(cfg['lr']))
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=int(
-        (len(train_loader) + len(train_loader_yz) + len(train_loader_xz)) * 10),
-                                                                     eta_min=float(cfg['min_lr']))
+    scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, steps_per_epoch=int(
+        (len(train_loader) + len(train_loader_yz) + len(train_loader_xz))), epochs=cfg['epochs'],
+                                                    max_lr=float(cfg['lr']), pct_start=0.2)
     (train_loader, valid_loader, model, optimizer, scheduler, train_loader_yz, train_loader_xz,
      ) = accelerate.prepare(
         train_loader,
@@ -120,11 +120,6 @@ def main(cfg):
         accelerate.wait_for_everyone()
         unwrapped_model = accelerate.unwrap_model(model)
         model_weights = unwrapped_model.state_dict()
-        model_weights = OrderedDict({key: model_weights[key] for key in model_weights.keys()})
-        for _ in range(len(model_weights)):
-            k, v = model_weights.popitem(False)
-            new_key = k.replace("_orig_mod.", '')
-            model_weights[new_key] = v
         if dice_score > best_dice:
             best_dice = dice_score
 
