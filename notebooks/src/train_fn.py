@@ -20,9 +20,7 @@ tqdm_style = {
 
 
 def train_fn(
-        train_loader: DataLoader,
-        train_loader_xz: DataLoader,
-        train_loader_yz: DataLoader,
+        data_loader_list: list,
         model: Module,
         criterion: Module,
         optimizer: optim.Optimizer,
@@ -36,7 +34,7 @@ def train_fn(
     torch.cuda.empty_cache()
     model.train()
     loss_metric = 0
-    combined_loader = CombinedDataLoader(train_loader, train_loader_xz, train_loader_yz, )
+    combined_loader = CombinedDataLoader(*data_loader_list)
     stream = tqdm(combined_loader, total=len(combined_loader), disable=not accelerator.is_local_main_process,
                   **tqdm_style)
 
@@ -46,7 +44,7 @@ def train_fn(
         output = model(images)
         loss = criterion(output, masks)
         accelerator.backward(loss)
-        if i % 1 == 0:
+        if i % 2 == 0:
             optimizer.step()
             optimizer.zero_grad()
             scheduler.step()
@@ -127,4 +125,4 @@ def validation_fn(
         f"Epoch:{epoch + 1}, valid_loss: {loss_metric:.5f} ,Dice Coefficient {dice_score},surface_dice: {max_surface_dice:.5f} ,threshold_score_dict   {threshold_score_dict} ")
     accelerator.log(
         {f"surface_dice": max_surface_dice, f"valid_loss": loss_metric, f"best_threshold": best_threshold, })
-    return dice_score,max_surface_dice
+    return dice_score, max_surface_dice

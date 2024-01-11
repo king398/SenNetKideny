@@ -5,7 +5,7 @@ import numpy as np
 import yaml
 import pandas as pd
 from accelerate import Accelerator, DistributedDataParallelKwargs
-from utils import seed_everything, write_yaml, norm_by_percentile
+from utils import seed_everything, write_yaml, norm_by_percentile,load_images_and_masks
 import gc
 from dataset import ImageDataset
 from pathlib import Path
@@ -32,27 +32,39 @@ def main(cfg):
     accelerate.init_trackers(project_name="SenNetKidney", config=cfg)
     kidneys_df = pd.read_csv(cfg['kidneys_df'])
     kidney_rle = {kidneys_df['id'][i]: kidneys_df['kidney_rle'][i] for i in range(len(kidneys_df))}
-    train_images = os.listdir(f"{cfg['train_dir']}/images/")
-    validation_images = sorted(os.listdir(f"{cfg['validation_dir']}/images/"))
-    train_images_xz = os.listdir(f"{cfg['train_dir']}_xz/images/")
-    train_images_yz = os.listdir(f"{cfg['train_dir']}_yz/images/")
-    train_kidneys_rle = list(map(lambda x: kidney_rle[f"kidney_1_dense_{x.split('.')[0]}"], train_images))
-    train_images = list(map(lambda x: f"{cfg['train_dir']}/images/{x}", train_images))
-    train_volume = np.stack([cv2.imread(i, cv2.IMREAD_GRAYSCALE).astype(np.float16) for i in tqdm(train_images)])
-    train_volume = norm_by_percentile(train_volume)
-    train_masks = list(map(lambda x: x.replace("images", "labels"), train_images))
-    validation_kidneys_rle = list(map(lambda x: kidney_rle[f"kidney_3_dense_{x.split('.')[0]}"], validation_images))
-    validation_images = list(map(lambda x: f"{cfg['validation_dir']}/images/{x}", validation_images))
-    validation_volume = np.stack(
-        [cv2.imread(i, cv2.IMREAD_GRAYSCALE).astype(np.float16) for i in tqdm(validation_images)])
-    validation_volume = norm_by_percentile(validation_volume)
-    validation_masks = list(map(lambda x: x.replace("images", "labels"), validation_images))
-    train_xz_kidneys_rle = list(map(lambda x: kidney_rle[f"kidney_1_dense_xz_{x.split('.')[0]}"], train_images_xz))
-    train_images_xz = list(map(lambda x: f"{cfg['train_dir']}_xz/images/{x}", train_images_xz))
-    train_masks_xz = list(map(lambda x: x.replace("images", "labels"), train_images_xz))
-    train_yz_kidneys_rle = list(map(lambda x: kidney_rle[f"kidney_1_dense_yz_{x.split('.')[0]}"], train_images_yz))
-    train_images_yz = list(map(lambda x: f"{cfg['train_dir']}_yz/images/{x}", train_images_yz))
-    train_masks_yz = list(map(lambda x: x.replace("images", "labels"), train_images_yz))
+    train_images, train_masks, train_kidneys_rle, train_volume = load_images_and_masks(
+        cfg['train_dir'], 'images', 'labels', kidney_rle, 'kidney_1_dense'
+    )
+
+    # Load validation images and masks
+    validation_images, validation_masks, validation_kidneys_rle, validation_volume = load_images_and_masks(
+        cfg['validation_dir'], 'images', 'labels', kidney_rle, 'kidney_2'
+    )
+
+    # Load train images and masks for train_dir_2
+    train_images_2, train_masks_2, train_kidneys_rle_2, train_volume_2 = load_images_and_masks(
+        cfg['train_dir_2'], 'images', 'labels', kidney_rle, 'kidney_3_sparse'
+    )
+
+    # Load train images and masks for train_dir_xz
+    train_images_xz, train_masks_xz, train_xz_kidneys_rle, train_volume_xz = load_images_and_masks(
+        cfg['train_dir'] + '_xz', 'images', 'labels', kidney_rle, 'kidney_1_dense_xz'
+    )
+
+    # Load train images and masks for train_dir_yz
+    train_images_yz, train_masks_yz, train_yz_kidneys_rle, train_volume_yz = load_images_and_masks(
+        cfg['train_dir'] + '_yz', 'images', 'labels', kidney_rle, 'kidney_1_dense_yz'
+    )
+
+    # Load train images and masks for train_dir_2_xz
+    train_images_2_xz, train_masks_2_xz, train_xz_kidneys_rle_2, train_volume_2_xz = load_images_and_masks(
+        cfg['train_dir_2'] + '_xz', 'images', 'labels', kidney_rle, 'kidney_3_sparse_xz'
+    )
+
+    # Load train images and masks for train_dir_2_yz
+    train_images_2_yz, train_masks_2_yz, train_yz_kidneys_rle_2, train_volume_2_yz = load_images_and_masks(
+        cfg['train_dir_2'] + '_yz', 'images', 'labels', kidney_rle, 'kidney_3_sparse_yz'
+    )
 
     train_dataset = ImageDataset(train_images, train_masks, get_train_transform(), train_kidneys_rle, train_volume,
                                  mode="xy")
@@ -62,6 +74,12 @@ def main(cfg):
                                     train_xz_kidneys_rle, train_volume, mode="xz")
     train_dataset_yz = ImageDataset(train_images_yz, train_masks_yz, get_train_transform(),
                                     train_yz_kidneys_rle, train_volume, mode="yz")
+    train_dataset_2 = ImageDataset(train_images_2, train_masks_2, get_train_transform(), train_kidneys_rle_2,
+                                   train_volume_2, mode="xy")
+    train_dataset_2_xz = ImageDataset(train_images_2_xz, train_masks_2_xz, get_train_transform(),
+                                      train_xz_kidneys_rle_2, train_volume_2, mode="xz")
+    train_dataset_2_yz = ImageDataset(train_images_2_yz, train_masks_2_yz, get_train_transform(),
+                                      train_yz_kidneys_rle_2, train_volume_2, mode="yz")
     train_loader = DataLoader(train_dataset, batch_size=cfg['batch_size'], shuffle=True, num_workers=cfg['num_workers'],
                               pin_memory=True)
 
@@ -71,6 +89,12 @@ def main(cfg):
                                  num_workers=cfg['num_workers'], pin_memory=True)
     valid_loader = DataLoader(valid_dataset, batch_size=cfg['batch_size'], shuffle=False,
                               num_workers=cfg['num_workers'], pin_memory=True)
+    train_loader_2 = DataLoader(train_dataset_2, batch_size=cfg['batch_size'], shuffle=True,
+                                num_workers=cfg['num_workers'], pin_memory=True)
+    train_loader_2_xz = DataLoader(train_dataset_2_xz, batch_size=cfg['batch_size'], shuffle=True,
+                                   num_workers=cfg['num_workers'], pin_memory=True)
+    train_loader_2_yz = DataLoader(train_dataset_2_yz, batch_size=cfg['batch_size'], shuffle=True,
+                                   num_workers=cfg['num_workers'], pin_memory=True)
 
     model = ReturnModel(cfg['model_name'], in_channels=cfg['in_channels'], classes=cfg['classes'],
                         pad_factor=cfg['pad_factor'], )
@@ -78,12 +102,14 @@ def main(cfg):
     scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, steps_per_epoch=int(
         (len(train_loader) + len(train_loader_yz) + len(train_loader_xz))), epochs=cfg['epochs'],
                                                     max_lr=float(cfg['lr']), pct_start=0.2)
-    (train_loader, valid_loader, model, optimizer, scheduler, train_loader_yz, train_loader_xz,
+    (train_loader, valid_loader, model, optimizer, scheduler, train_loader_yz, train_loader_xz, train_loader_2,
+     train_loader_2_xz, train_loader_2_yz,
      ) = accelerate.prepare(
         train_loader,
         valid_loader,
         model,
-        optimizer, scheduler, train_loader_yz, train_loader_xz,
+        optimizer, scheduler, train_loader_yz, train_loader_xz, train_loader_2,
+        train_loader_2_xz, train_loader_2_yz,
     )
 
     criterion = DiceLoss(mode="multilabel")
@@ -94,10 +120,8 @@ def main(cfg):
 
     for epoch in range(cfg['epochs']):
         train_fn(
-
-            train_loader=train_loader,
-            train_loader_xz=train_loader_xz,
-            train_loader_yz=train_loader_yz,
+            data_loader_list=[train_loader, train_loader_xz, train_loader_yz, train_loader_2, train_loader_2_xz,
+                              train_loader_2_yz],
             model=model,
             criterion=criterion,
             optimizer=optimizer,

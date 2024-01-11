@@ -8,10 +8,11 @@ import yaml
 
 solution_df = pd.read_csv("/home/mithil/PycharmProjects/SenNetKideny/data/kidney_3_dense_full.csv")
 
-model_dir = "seresnext50_multiview_30_epoch_5e_04_dice_loss_normalize_hflip_3_channels"
-submission_df = pd.read_csv(f"/home/mithil/PycharmProjects/SenNetKideny/models/{model_dir}/oof_csv.csv")
+model_dir = "maxvit_small_tf_224_no_min_max_one_cycle_diff_no_kidney"
+submission_df = pd.read_csv(f"/home/mithil/PycharmProjects/SenNetKideny/models/{model_dir}/oof_csv.csv")[496:997].reset_index(drop=True)
+submission_df['id'] = submission_df['id'].apply(lambda x: x.replace('sparse', 'dense'))
 ids = submission_df['id'].values
-volume = np.load(f"/home/mithil/PycharmProjects/SenNetKideny/models/{model_dir}/oof_volume.npz")['volume']
+volume = np.load(f"/home/mithil/PycharmProjects/SenNetKideny/models/{model_dir}/oof_volume.npz")['volume'][496:997]
 thresholds = np.linspace(0.10, 0.5, 9)
 scores = {}
 for threshold in tqdm(thresholds):
