@@ -179,7 +179,8 @@ def load_images_and_masks(directory, image_subdir, label_subdir, kidney_rle, kid
     labels_full_path = [f.replace(image_subdir, label_subdir) for f in images_full_path]
 
     kidneys_rle = [kidney_rle[f"{kidney_rle_prefix}_{f.split('.')[0]}"] for f in image_files]
-    if ["xz", "yz"] in directory:
+    if "xz" in directory or "yz" in directory:
+
         return images_full_path, labels_full_path, kidneys_rle
     else:
         volume = np.stack([cv2.imread(i, cv2.IMREAD_GRAYSCALE).astype(np.float16) for i in tqdm(images_full_path)])
