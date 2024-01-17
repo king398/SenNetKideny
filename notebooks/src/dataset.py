@@ -1,46 +1,24 @@
-import numpy as np
-
 from utils import *
 from torch.utils.data import Dataset
 import cv2
 from albumentations import Compose
-from typing import Tuple, List, Literal
+from typing import Tuple, List
 import torch
-
+from typing import Literal
 
 class ImageDataset(Dataset):
-    def __init__(self, image_paths: List[str], mask_paths: List[str], transform: Compose, kidney_rle: List[str],
-                 volume: np.array, mode: Literal["xy", "yz", "xz"] = "xy",):
+    def __init__(self, image_paths: List[str], mask_paths: List[str], transform: Compose, kidney_rle: List[str]):
         self.image_paths = image_paths
         self.mask_paths = mask_paths
         self.kidney_rle = kidney_rle
         self.transform = transform
-        self.volume = volume
-        self.mode = mode
 
     def __len__(self) -> int:
-        match self.mode:
-            case "xy":
-                return self.volume.shape[0]
-            case "xz":
-                return self.volume.shape[1]
-            case "yz":
-                return self.volume.shape[2]
+        return len(self.image_paths)
 
-
-
-    def __getitem__(self, item) -> Tuple[torch.Tensor, torch.Tensor, str]:
-        match self.mode:
-            case "xy":
-                image = self.volume[item].astype(np.float32)
-            case "xz":
-                image = self.volume[:, item].astype(np.float32)
-            case "yz":
-                image = self.volume[:, :, item].astype(np.float32)
-            case _:
-                raise ValueError("Invalid mode")
-
-        image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
+    def __getitem__(self, item) -> Tuple[torch.Tensor, torch.Tensor]:
+        image = cv2.imread(self.image_paths[item])
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         image = (image - image.min()) / (image.max() - image.min() + 0.0001)
 
         mask = cv2.imread(self.mask_paths[item])
@@ -51,10 +29,7 @@ class ImageDataset(Dataset):
         augmented = self.transform(image=image, mask=mask)
         image = augmented["image"]
         mask = augmented["mask"]
-        image_id = self.image_paths[item].split("/")[-1].split(".")[0]
-        folder_id = self.image_paths[item].split("/")[-3]
-        image_id = f"{folder_id}_{image_id}"
-        return image, mask, image_id
+        return image, mask
 
 
 class ImageDatasetOOF(Dataset):

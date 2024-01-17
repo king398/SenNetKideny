@@ -2,11 +2,12 @@ from albumentations import *
 from albumentations.pytorch import ToTensorV2
 
 
-def get_train_transform(height: int = 1344, width: int = 1120) -> Compose:
+def get_train_transform(height: int = 1312, width: int = 928) -> Compose:
     return Compose([
-        # RandomBrightnessContrast(p=0.05,),
-        HorizontalFlip(p=0.5),
-        VerticalFlip(p=0.5),
+        PadIfNeeded(min_height=height, min_width=width),
+        # HorizontalFlip(p=0.5),
+        # VerticalFlip(p=0.5),
+        # RandomRotate90(p=0.5),
         ToTensorV2(transpose_mask=True), ])
 
 
@@ -26,7 +27,8 @@ def reverse_padding(image: int, original_height: int, original_width: int):
     return transform(image=image)['image']
 
 
-def get_valid_transform() -> Compose:
+def get_valid_transform(height: int = 1728, width: int = 1536) -> Compose:
     return Compose([
+        PadIfNeeded(min_height=height, min_width=width),
         ToTensorV2(transpose_mask=True),
     ])
