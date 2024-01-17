@@ -26,15 +26,6 @@ class Dice(nn.Module):
         return dice
 
 
-def norm_by_percentile(volume, low=10, high=99.8, alpha=0.01):
-    xmin = np.percentile(volume, low)
-    xmax = np.percentile(volume, high)
-    x = (volume - xmin) / (xmax - xmin)
-    if 1:
-        x[x > 1] = (x[x > 1] - 1) * alpha + 1
-        x[x < 0] = (x[x < 0]) * alpha
-    # x = np.clip(x,0,1)
-    return x
 
 
 class Dice_Valid(nn.Module):
@@ -176,7 +167,6 @@ def load_images_and_masks(directory, image_subdir, label_subdir, kidney_rle, kid
 
     image_files = sorted(os.listdir(image_dir))
     images_full_path = [os.path.join(image_dir, f) for f in image_files]
-    print(images_full_path)
     labels_full_path = [f.replace(image_subdir, label_subdir) for f in images_full_path]
 
     kidneys_rle = [kidney_rle[f"{kidney_rle_prefix}_{f.split('.')[0]}"] for f in image_files]

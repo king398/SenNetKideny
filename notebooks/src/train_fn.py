@@ -39,22 +39,23 @@ def train_fn(
                   **tqdm_style)
 
     for i, (images, masks, image_ids) in enumerate(stream):
-        masks = masks.float().contiguous()
-        images = images.float().contiguous()
-        output = model(images)
-        loss = criterion(output, masks)
-        accelerator.backward(loss)
-        optimizer.step()
-        optimizer.zero_grad()
-        scheduler.step()
-        outputs, masks = accelerator.gather_for_metrics((output, masks))
-        loss_metric += loss.item() / (i + 1)
-        dice_batch = dice(outputs, masks)
-        stream.set_description(
-            f"Epoch:{epoch + 1}, train_loss: {loss_metric:.5f}, dice_batch: {dice_batch.item():.5f}")
+        with accelerator.accumulate(model):
+            masks = masks.float().contiguous()
+            images = images.float().contiguous()
+            output = model(images)
+            loss = criterion(output, masks)
+            accelerator.backward(loss)
+            optimizer.step()
+            optimizer.zero_grad()
+            scheduler.step()
+            outputs, masks = accelerator.gather_for_metrics((output, masks))
+            loss_metric += loss.item() / (i + 1)
+            dice_batch = dice(outputs, masks)
+            stream.set_description(
+                f"Epoch:{epoch + 1}, train_loss: {loss_metric:.5f}, dice_batch: {dice_batch.item():.5f}")
 
-        accelerator.log({f"train_loss_{fold}": loss_metric, f"train_dice_batch_{fold}": dice_batch.item(),
-                         f"lr_{fold}": optimizer.param_groups[0]['lr']})
+            accelerator.log({f"train_loss_{fold}": loss_metric, f"train_dice_batch_{fold}": dice_batch.item(),
+                             f"lr_{fold}": optimizer.param_groups[0]['lr']})
 
 
 def validation_fn(
@@ -64,6 +65,7 @@ def validation_fn(
         epoch: int,
         accelerator: Accelerator,
         labels_df: pd.DataFrame,
+        model_dir: str,
 ):
     gc.collect()
     torch.cuda.empty_cache()
@@ -100,6 +102,7 @@ def validation_fn(
                 output_mask = image[0, :, :] * kidney
                 # iterate from threshold 0.1 to 0.5
                 threshold = [0.1, 0.2, 0.3, 0.4, 0.5]
+
                 for m, t in enumerate(threshold):
                     output_mask_new = output_mask.copy()
                     output_mask_new = (output_mask_new > t).astype(np.uint8)

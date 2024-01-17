@@ -25,7 +25,7 @@ class ReturnModel(nn.Module):
         # Pad the input
         original_size = x.shape[2:]
         x, pad = self._pad_image(x, pad_factor=self.pad_factor)
-        x = checkpoint(self.unet.encoder, x)
+        x = checkpoint(self.unet.encoder, x,use_reentrant=True)
 
         x = self.unet.decoder(*x)
         x = self.unet.segmentation_head(x)

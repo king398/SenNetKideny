@@ -5,7 +5,7 @@ import numpy as np
 import yaml
 import pandas as pd
 from accelerate import Accelerator, DistributedDataParallelKwargs
-from utils import seed_everything, write_yaml, norm_by_percentile,load_images_and_masks
+from utils import seed_everything, write_yaml, norm_by_percentile, load_images_and_masks
 import gc
 from dataset import ImageDataset
 from pathlib import Path
@@ -15,7 +15,7 @@ from model import *
 import torch
 from train_fn import train_fn, validation_fn
 import argparse
-from segmentation_models_pytorch.losses import DiceLoss
+from segmentation_models_pytorch.losses import SoftBCEWithLogitsLoss
 import cv2
 from tqdm import tqdm
 
@@ -28,6 +28,7 @@ def main(cfg):
         mixed_precision="fp16", log_with=["wandb"],
         kwargs_handlers=[DistributedDataParallelKwargs(gradient_as_bucket_view=True, find_unused_parameters=True, ), ],
         project_dir="logs",
+        gradient_accumulation_steps=cfg['gradient_accumulation_steps'],
     )
     accelerate.init_trackers(project_name="SenNetKidney", config=cfg)
     kidneys_df = pd.read_csv(cfg['kidneys_df'])
@@ -99,9 +100,9 @@ def main(cfg):
     model = ReturnModel(cfg['model_name'], in_channels=cfg['in_channels'], classes=cfg['classes'],
                         pad_factor=cfg['pad_factor'], )
     optimizer = torch.optim.AdamW(model.parameters(), lr=float(cfg['lr']))
-    scheduler =  torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=int(
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=int(
         (len(train_loader) + len(train_loader_yz) + len(train_loader_xz)) * 10),
-                                                                      eta_min=float(cfg['min_lr']))
+                                                                     eta_min=float(cfg['min_lr']))
     (train_loader, valid_loader, model, optimizer, scheduler, train_loader_yz, train_loader_xz, train_loader_2,
      train_loader_2_xz, train_loader_2_yz,
      ) = accelerate.prepare(
@@ -112,7 +113,7 @@ def main(cfg):
         train_loader_2_xz, train_loader_2_yz,
     )
 
-    criterion = DiceLoss(mode="multilabel")
+    criterion = SoftBCEWithLogitsLoss()
     best_dice = -1
     best_surface_dice = -1
     # remove all the rows which do not contain kidney_3_dense in the id column
@@ -137,7 +138,8 @@ def main(cfg):
             criterion=criterion,
             epoch=epoch,
             accelerator=accelerate,
-            labels_df=labels_df
+            labels_df=labels_df,
+            model_dir=cfg['model_dir'],
 
         )
         accelerate.wait_for_everyone()
