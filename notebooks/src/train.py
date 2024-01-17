@@ -38,7 +38,7 @@ def main(cfg):
 
     # Load validation images and masks
     validation_images, validation_masks, validation_kidneys_rle, validation_volume = load_images_and_masks(
-        cfg['validation_dir'], 'images', 'labels', kidney_rle, 'kidney_2'
+        cfg['validation_dir'], 'images', 'labels', kidney_rle, 'kidney_3_dense'
     )
 
     # Load train images and masks for train_dir_2
@@ -99,9 +99,9 @@ def main(cfg):
     model = ReturnModel(cfg['model_name'], in_channels=cfg['in_channels'], classes=cfg['classes'],
                         pad_factor=cfg['pad_factor'], )
     optimizer = torch.optim.AdamW(model.parameters(), lr=float(cfg['lr']))
-    scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, steps_per_epoch=int(
-        (len(train_loader) + len(train_loader_yz) + len(train_loader_xz))), epochs=cfg['epochs'],
-                                                    max_lr=float(cfg['lr']), pct_start=0.2)
+    scheduler =  torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=int(
+        (len(train_loader) + len(train_loader_yz) + len(train_loader_xz)) * 10),
+                                                                      eta_min=float(cfg['min_lr']))
     (train_loader, valid_loader, model, optimizer, scheduler, train_loader_yz, train_loader_xz, train_loader_2,
      train_loader_2_xz, train_loader_2_yz,
      ) = accelerate.prepare(
@@ -120,8 +120,7 @@ def main(cfg):
 
     for epoch in range(cfg['epochs']):
         train_fn(
-            data_loader_list=[train_loader, train_loader_xz, train_loader_yz, train_loader_2, train_loader_2_xz,
-                              train_loader_2_yz],
+            data_loader_list=[train_loader, train_loader_xz, train_loader_yz],
             model=model,
             criterion=criterion,
             optimizer=optimizer,

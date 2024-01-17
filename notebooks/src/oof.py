@@ -186,7 +186,7 @@ config = {
     "in_channels": 3,
     "classes": 2,
     # "test_dir": '/kaggle/input/blood-vessel-segmentation/test',
-    "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/maxvit_small_tf_224_no_min_max_one_cycle_diff_no_kidney/model.pth",
+    "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/maxvit_small_tf_224_one_cycle_diff/model.pth",
     "batch_size": 1,
     "num_workers": 8,
     "pad_factor": 224,

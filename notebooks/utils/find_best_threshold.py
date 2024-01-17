@@ -8,7 +8,7 @@ import yaml
 
 solution_df = pd.read_csv("/home/mithil/PycharmProjects/SenNetKideny/data/kidney_3_dense_full.csv")
 
-model_dir = "maxvit_small_tf_224_no_min_max_one_cycle_diff_no_kidney"
+model_dir = "maxvit_small_tf_224_one_cycle_diff"
 submission_df = pd.read_csv(f"/home/mithil/PycharmProjects/SenNetKideny/models/{model_dir}/oof_csv.csv")[496:997].reset_index(drop=True)
 submission_df['id'] = submission_df['id'].apply(lambda x: x.replace('sparse', 'dense'))
 ids = submission_df['id'].values

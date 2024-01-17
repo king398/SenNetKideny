@@ -44,10 +44,9 @@ def train_fn(
         output = model(images)
         loss = criterion(output, masks)
         accelerator.backward(loss)
-        if i % 2 == 0:
-            optimizer.step()
-            optimizer.zero_grad()
-            scheduler.step()
+        optimizer.step()
+        optimizer.zero_grad()
+        scheduler.step()
         outputs, masks = accelerator.gather_for_metrics((output, masks))
         loss_metric += loss.item() / (i + 1)
         dice_batch = dice(outputs, masks)
