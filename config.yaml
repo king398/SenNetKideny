@@ -15,3 +15,6 @@ train_dir: /home/mithil/PycharmProjects/SenNetKideny/data/train/kidney_1_dense
 train_dir_2: /home/mithil/PycharmProjects/SenNetKideny/data/train/kidney_3_sparse
 validation_dir: /home/mithil/PycharmProjects/SenNetKideny/data/train/kidney_3_dense
 pad_factor: 32
+
+
+# Path: config.yaml
