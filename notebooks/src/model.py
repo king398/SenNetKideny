@@ -7,7 +7,17 @@ from segmentation_models_pytorch.base.heads import SegmentationHead
 from torch import nn
 import torch
 from torch.nn import functional as F
+def return_model(model_name: str, in_channels: int, classes: int):
+    model = smp.Unet(
+        encoder_name=model_name,
+        encoder_weights="imagenet",
+        in_channels=in_channels,
+        classes=classes,
 
+
+
+    )
+    return model
 
 class ReturnModel(nn.Module):
     def __init__(self, model_name: str, in_channels: int, classes: int, pad_factor: int):

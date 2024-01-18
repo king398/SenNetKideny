@@ -182,14 +182,14 @@ def main(cfg: dict):
 
 config = {
     "seed": 42,
-    "model_name": "tu-timm/maxvit_small_tf_224.in1k",
+    "model_name": "tu-timm/seresnext101d_32x8d.ah_in1k",
     "in_channels": 3,
     "classes": 2,
     # "test_dir": '/kaggle/input/blood-vessel-segmentation/test',
-    "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/maxvit_small_tf_224_one_cycle_diff/model.pth",
+    "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/seresnext101d_32x8d_flip_no_checkpointing_bce_loss/model_best_surface_dice.pth",
     "batch_size": 1,
     "num_workers": 8,
-    "pad_factor": 224,
+    "pad_factor": 32,
 }
 if __name__ == "__main__":
     main(config)
