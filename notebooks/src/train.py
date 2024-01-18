@@ -39,7 +39,7 @@ def main(cfg):
 
     # Load validation images and masks
     validation_images, validation_masks, validation_kidneys_rle, validation_volume = load_images_and_masks(
-        cfg['validation_dir'], 'images', 'labels', kidney_rle, 'kidney_3_dense'
+        cfg['validation_dir'], 'images', 'labels', kidney_rle, 'kidney_2'
     )
 
     # Load train images and masks for train_dir_2
@@ -121,7 +121,7 @@ def main(cfg):
 
     for epoch in range(cfg['epochs']):
         train_fn(
-            data_loader_list=[train_loader, train_loader_xz, train_loader_yz],
+            data_loader_list=[train_loader, train_loader_xz, train_loader_yz, train_loader_2, train_loader_2_xz,train_loader_2_yz],
             model=model,
             criterion=criterion,
             optimizer=optimizer,

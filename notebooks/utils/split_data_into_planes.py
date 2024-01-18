@@ -5,7 +5,7 @@ from notebooks.src.utils import rle_decode, rle_encode
 
 import pandas as pd
 
-volume = "kidney_3_dense"
+volume = "kidney_1_dense"
 data_dir = f"/home/mithil/PycharmProjects/SenNetKideny/data/train/{volume}"
 kidneys_rle = pd.read_csv("/home/mithil/PycharmProjects/SenNetKideny/data/train_rles_kidneys.csv")
 # convert kidney_rle to a dict
@@ -15,7 +15,7 @@ kidneys_rle = kidneys_rle[kidneys_rle['id'].str.contains(volume)].reset_index(dr
 masks = []
 images = []
 kidney_masks = []
-for i in range(496, 496+len(os.listdir(f'{data_dir}/labels/'))):
+for i in range(len(os.listdir(f'{data_dir}/labels/'))):
     print('\r', i, end='')
     v = cv2.imread(f'{data_dir}/labels/{i:04d}.tif', cv2.IMREAD_GRAYSCALE)
     masks.append(v)

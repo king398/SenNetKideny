@@ -41,7 +41,6 @@ class ImageDataset(Dataset):
                 raise ValueError("Invalid mode")
 
         image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
-        image = (image - image.min()) / (image.max() - image.min() + 0.0001)
 
         mask = cv2.imread(self.mask_paths[item])
         mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
@@ -78,11 +77,11 @@ class ImageDatasetOOF(Dataset):
     def __getitem__(self, item) -> tuple[torch.Tensor, Tuple, str]:
         match self.mode:
             case "xy":
-                image = self.volume[item]
+                image = self.volume[item].astype(np.float32)
             case "xz":
-                image = self.volume[:, item]
+                image = self.volume[:, item].astype(np.float32)
             case "yz":
-                image = self.volume[:, :, item]
+                image = self.volume[:, :, item].astype(np.float32)
             case _:
                 raise ValueError("Invalid mode")
 
