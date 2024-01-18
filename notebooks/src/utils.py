@@ -177,6 +177,6 @@ def load_images_and_masks(directory, image_subdir, label_subdir, kidney_rle, kid
         return images_full_path, labels_full_path, kidneys_rle
     else:
         volume = np.stack([cv2.imread(i, cv2.IMREAD_GRAYSCALE) for i in tqdm(images_full_path)]).astype(np.float16)
-        volume = (volume - volume.min()) / (volume.max() - volume.min() + 0.0001)
+        volume = (volume -volume.min()) / (volume.max() - volume.min() + 0.0001)
         gc.collect()
         return images_full_path, labels_full_path, kidneys_rle, volume
