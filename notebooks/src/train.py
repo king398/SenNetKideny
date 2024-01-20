@@ -15,7 +15,7 @@ from model import *
 import torch
 from train_fn import train_fn, validation_fn
 import argparse
-from segmentation_models_pytorch.losses import SoftBCEWithLogitsLoss
+from segmentation_models_pytorch.losses import *
 import cv2
 from tqdm import tqdm
 
@@ -39,7 +39,7 @@ def main(cfg):
 
     # Load validation images and masks
     validation_images, validation_masks, validation_kidneys_rle, validation_volume = load_images_and_masks(
-        cfg['validation_dir'], 'images', 'labels', kidney_rle, 'kidney_2'
+        cfg['validation_dir'], 'images', 'labels', kidney_rle, 'kidney_3_dense'
     )
 
     # Load train images and masks for train_dir_2
@@ -113,7 +113,7 @@ def main(cfg):
         train_loader_2_xz, train_loader_2_yz,
     )
 
-    criterion = SoftBCEWithLogitsLoss()
+    criterion = DiceLoss(mode="multilabel")
     best_dice = -1
     best_surface_dice = -1
     # remove all the rows which do not contain kidney_3_dense in the id column
@@ -121,7 +121,7 @@ def main(cfg):
 
     for epoch in range(cfg['epochs']):
         train_fn(
-            data_loader_list=[train_loader, train_loader_xz, train_loader_yz, train_loader_2, train_loader_2_xz,train_loader_2_yz],
+            data_loader_list=[train_loader, train_loader_xz, train_loader_yz, ],
             model=model,
             criterion=criterion,
             optimizer=optimizer,

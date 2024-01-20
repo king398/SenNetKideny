@@ -47,7 +47,7 @@ def train_fn(
             accelerator.backward(loss)
             optimizer.step()
             optimizer.zero_grad()
-            #scheduler.step()
+            scheduler.step()
             outputs, masks = accelerator.gather_for_metrics((output, masks))
             loss_metric += loss.item() / (i + 1)
             dice_batch = dice(outputs, masks)

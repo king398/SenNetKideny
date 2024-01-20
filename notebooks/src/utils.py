@@ -28,8 +28,6 @@ class Dice(nn.Module):
         return dice
 
 
-
-
 class Dice_Valid(nn.Module):
     def __init__(self, threshold=0.5):
         super(Dice_Valid, self).__init__()
@@ -153,14 +151,14 @@ def apply_hysteresis_thresholding(volume: np.array, low: float, high: float, chu
 
 
 def norm_by_percentile(volume, low=10, high=99.8, alpha=0.01):
-    #xmin = np.percentile(volume, low)
-    #xmax = np.percentile(volume, high)
-    #x = (volume - xmin) / (xmax - xmin)
-    #if 1:
-        #x[x > 1] = (x[x > 1] - 1) * alpha + 1
-        #x[x < 0] = (x[x < 0]) * alpha
+    xmin = np.percentile(volume, low)
+    xmax = np.percentile(volume, high)
+    x = (volume - xmin) / (xmax - xmin)
+    if 1:
+        x[x > 1] = (x[x > 1] - 1) * alpha + 1
+        x[x < 0] = (x[x < 0]) * alpha
     # x = np.clip(x,0,1)
-    return volume
+    return x
 
 
 def load_images_and_masks(directory, image_subdir, label_subdir, kidney_rle, kidney_rle_prefix):
@@ -173,10 +171,7 @@ def load_images_and_masks(directory, image_subdir, label_subdir, kidney_rle, kid
 
     kidneys_rle = [kidney_rle[f"{kidney_rle_prefix}_{f.split('.')[0]}"] for f in image_files]
     if "xz" in directory or "yz" in directory:
-
         return images_full_path, labels_full_path, kidneys_rle
     else:
-        volume = np.stack([cv2.imread(i, cv2.IMREAD_GRAYSCALE) for i in tqdm(images_full_path)]).astype(np.float16)
-        volume = (volume -volume.min()) / (volume.max() - volume.min() + 0.0001)
-        gc.collect()
-        return images_full_path, labels_full_path, kidneys_rle, volume
+        volume = np.stack([cv2.imread(i, cv2.IMREAD_GRAYSCALE).astype(np.float16) for i in tqdm(images_full_path)])
+        return images_full_path, labels_full_path, kidneys_rle, norm_by_percentile(volume)
