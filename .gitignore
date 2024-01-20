@@ -5,4 +5,4 @@
 /models
 /wandb
 *.csv
-*.idea/
+.idea/
