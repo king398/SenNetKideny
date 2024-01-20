@@ -15,10 +15,7 @@ from model import *
 import torch
 from train_fn import train_fn, validation_fn
 import argparse
-from segmentation_models_pytorch.losses import *
-import cv2
-from tqdm import tqdm
-
+from loss import CombinedLoss
 
 def main(cfg):
     warnings.filterwarnings("ignore")
@@ -113,7 +110,7 @@ def main(cfg):
         train_loader_2_xz, train_loader_2_yz,
     )
 
-    criterion = DiceLoss(mode="multilabel")
+    criterion = CombinedLoss()
     best_dice = -1
     best_surface_dice = -1
     # remove all the rows which do not contain kidney_3_dense in the id column
