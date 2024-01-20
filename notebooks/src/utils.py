@@ -161,6 +161,8 @@ def norm_by_percentile(volume, low=10, high=99.8, alpha=0.01):
     return x
 
 
+
+
 def load_images_and_masks(directory, image_subdir, label_subdir, kidney_rle, kidney_rle_prefix):
     image_dir = os.path.join(directory, image_subdir)
     label_dir = os.path.join(directory, label_subdir)

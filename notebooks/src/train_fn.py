@@ -128,3 +128,5 @@ def validation_fn(
     accelerator.log(
         {f"surface_dice": max_surface_dice, f"valid_loss": loss_metric, f"best_threshold": best_threshold, })
     return dice_score, max_surface_dice
+
+
