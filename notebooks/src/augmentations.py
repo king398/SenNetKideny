@@ -1,4 +1,4 @@
-from albumentations import *
+from albumentations import Compose, CenterCrop
 from albumentations.pytorch import ToTensorV2
 import torch
 from torchvision.transforms import v2

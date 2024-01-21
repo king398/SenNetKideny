@@ -1,4 +1,4 @@
-from segmentation_models_pytorch.losses import *
+from segmentation_models_pytorch.losses import DiceLoss, SoftBCEWithLogitsLoss
 from torch import nn
 import torch
 

@@ -150,18 +150,51 @@ def apply_hysteresis_thresholding(volume: np.array, low: float, high: float, chu
     return predict
 
 
-def norm_by_percentile(volume:np.array, low:int=10, high:int=99.8, alpha:int=0.01):
-    xmin = np.percentile(volume, low)
-    xmax = np.percentile(volume, high)
+min_max = {
+    "kidney_1_dense": {
+        "mean": 23165.613198187508,
+        "std": 2747.315335558582,
+        "min": 0.0,
+        "max": 65535.0,
+        "q_min": 20243.0,
+        "q_max": 29649.0
+    },
+    "kidney_2": {
+        "mean": 32800.428034835626,
+        "std": 2534.013389861678,
+        "min": 2928.0,
+        "max": 65535.0,
+        "q_min": 29784.0,
+        "q_max": 42380.0
+    },
+    "kidney_3_dense": {
+        "mean": 19570.52992715221,
+        "std": 758.3516133619929,
+        "min": 4903.0,
+        "max": 63208.0,
+        "q_min": 18806.0,
+        "q_max": 21903.0
+    },
+    "kidney_3_sparse": {
+        "mean": 19536.406272288794,
+        "std": 881.0674124854231,
+        "min": 1488.0,
+        "max": 65248.0,
+        "q_min": 18966.0,
+        "q_max": 21944.0
+    }
+}
+
+
+def norm_by_percentile(volume: np.array, xmin: float, xmax: float, alpha: float = 0.01):
     x = (volume - xmin) / (xmax - xmin)
-    if 1:
-        x[x > 1] = (x[x > 1] - 1) * alpha + 1
-        x[x < 0] = (x[x < 0]) * alpha
-    # x = np.clip(x,0,1)
+    x[x > 1] = (x[x > 1] - 1) * alpha + 1
+    x[x < 0] = (x[x < 0]) * alpha
     return x
 
 
-def load_images_and_masks(directory: str, image_subdir: str, label_subdir: str, kidney_rle: dict, kidney_rle_prefix:str):
+def load_images_and_masks(directory: str, image_subdir: str, label_subdir: str, kidney_rle: dict,
+                          kidney_rle_prefix: str):
     image_dir = os.path.join(directory, image_subdir)
     label_dir = os.path.join(directory, label_subdir)
 
@@ -174,4 +207,7 @@ def load_images_and_masks(directory: str, image_subdir: str, label_subdir: str, 
         return images_full_path, labels_full_path, kidneys_rle
     else:
         volume = np.stack([cv2.imread(i, cv2.IMREAD_GRAYSCALE).astype(np.float16) for i in tqdm(images_full_path)])
-        return images_full_path, labels_full_path, kidneys_rle, norm_by_percentile(volume)
+        min_max_stats = min_max[kidney_rle_prefix]
+
+        return images_full_path, labels_full_path, kidneys_rle, norm_by_percentile(volume, xmin=min_max_stats["q_min"],
+                                                                                   xmax=min_max_stats["q_max"])

@@ -1,6 +1,6 @@
 import numpy as np
 
-from utils import *
+from utils import rle_decode
 from torch.utils.data import Dataset
 import cv2
 from albumentations import Compose

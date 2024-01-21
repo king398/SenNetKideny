@@ -43,6 +43,7 @@ def train_fn(
             images = images.float().contiguous()
             if random.random() > 0.5:
                 images, masks = CutMix(images, masks)
+                print("CutMix Done")
             output = model(images)
             loss = criterion(output, masks)
             accelerator.backward(loss)
