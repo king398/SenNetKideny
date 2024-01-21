@@ -1,6 +1,4 @@
-import torch
 from tqdm.auto import tqdm
-import gc
 from torch.utils.data import DataLoader
 from utils import *
 from torch.nn import Module
@@ -9,6 +7,7 @@ from accelerate import Accelerator
 import pandas as pd
 from metric import compute_surface_dice_score
 from dataset import CombinedDataLoader
+from augmentations import CutMix
 
 dice = Dice()
 dice_valid = Dice_Valid()
@@ -42,6 +41,8 @@ def train_fn(
         with accelerator.accumulate(model):
             masks = masks.float().contiguous()
             images = images.float().contiguous()
+            if random.random() > 0.5:
+                images, masks = CutMix(images, masks)
             output = model(images)
             loss = criterion(output, masks)
             accelerator.backward(loss)
@@ -128,5 +129,3 @@ def validation_fn(
     accelerator.log(
         {f"surface_dice": max_surface_dice, f"valid_loss": loss_metric, f"best_threshold": best_threshold, })
     return dice_score, max_surface_dice
-
-
