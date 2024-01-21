@@ -7,6 +7,8 @@ from segmentation_models_pytorch.base.heads import SegmentationHead
 from torch import nn
 import torch
 from torch.nn import functional as F
+
+
 def return_model(model_name: str, in_channels: int, classes: int):
     model = smp.Unet(
         encoder_name=model_name,
@@ -14,10 +16,9 @@ def return_model(model_name: str, in_channels: int, classes: int):
         in_channels=in_channels,
         classes=classes,
 
-
-
     )
     return model
+
 
 class ReturnModel(nn.Module):
     def __init__(self, model_name: str, in_channels: int, classes: int, pad_factor: int):
@@ -28,6 +29,8 @@ class ReturnModel(nn.Module):
             encoder_weights="imagenet",
             in_channels=in_channels,
             classes=classes,
+            #encoder_depth=4,
+            #decoder_channels=(256, 128, 64, 32),
         )
         self.pad_factor = pad_factor
 
@@ -35,10 +38,11 @@ class ReturnModel(nn.Module):
         # Pad the input
         original_size = x.shape[2:]
         x, pad = self._pad_image(x, pad_factor=self.pad_factor)
-        x = checkpoint(self.unet.encoder, x,use_reentrant=True)
+        x = checkpoint(self.unet.encoder, x, use_reentrant=True)
 
         x = self.unet.decoder(*x)
         x = self.unet.segmentation_head(x)
+        #x = F.upsample(x, scale_factor=2, mode='bilinear', align_corners=True)
         x = self._unpad(x, original_size, pad)
         return x
 

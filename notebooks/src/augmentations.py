@@ -1,13 +1,25 @@
 from albumentations import *
 from albumentations.pytorch import ToTensorV2
+import torch
+from torchvision.transforms import v2
 
 
 def get_train_transform(height: int = 1344, width: int = 1120) -> Compose:
     return Compose([
         # RandomBrightnessContrast(p=0.05,),
-        #HorizontalFlip(p=0.5),
-        #VerticalFlip(p=0.5),
+        # HorizontalFlip(p=0.5),
+        # VerticalFlip(p=0.5),
         ToTensorV2(transpose_mask=True), ])
+
+
+
+
+def CutMix(images: torch.tensor, masks: torch.tensor):
+    y = torch.randint(4, (images.shape[0],), dtype=torch.long)
+    concat = torch.cat([images, masks], dim=1)
+    cutmix = v2.CutMix(num_classes=4)
+    cutmixed_images_masks, _ = cutmix(concat, y)
+    return cutmixed_images_masks[:, 0:3], cutmixed_images_masks[:, 3:]
 
 
 def reverse_padding(image: int, original_height: int, original_width: int):

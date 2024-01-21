@@ -150,7 +150,7 @@ def apply_hysteresis_thresholding(volume: np.array, low: float, high: float, chu
     return predict
 
 
-def norm_by_percentile(volume, low=10, high=99.8, alpha=0.01):
+def norm_by_percentile(volume:np.array, low:int=10, high:int=99.8, alpha:int=0.01):
     xmin = np.percentile(volume, low)
     xmax = np.percentile(volume, high)
     x = (volume - xmin) / (xmax - xmin)
@@ -161,9 +161,7 @@ def norm_by_percentile(volume, low=10, high=99.8, alpha=0.01):
     return x
 
 
-
-
-def load_images_and_masks(directory, image_subdir, label_subdir, kidney_rle, kidney_rle_prefix):
+def load_images_and_masks(directory: str, image_subdir: str, label_subdir: str, kidney_rle: dict, kidney_rle_prefix:str):
     image_dir = os.path.join(directory, image_subdir)
     label_dir = os.path.join(directory, label_subdir)
 
