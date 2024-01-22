@@ -29,8 +29,8 @@ class ReturnModel(nn.Module):
             encoder_weights="imagenet",
             in_channels=in_channels,
             classes=classes,
-            #encoder_depth=4,
-            #decoder_channels=(256, 128, 64, 32),
+            encoder_depth=4,
+            decoder_channels=(256, 128, 64, 32),
         )
         self.pad_factor = pad_factor
 
@@ -42,7 +42,7 @@ class ReturnModel(nn.Module):
 
         x = self.unet.decoder(*x)
         x = self.unet.segmentation_head(x)
-        #x = F.upsample(x, scale_factor=2, mode='bilinear', align_corners=True)
+        x = F.upsample(x, scale_factor=2, mode='bilinear', align_corners=True)
         x = self._unpad(x, original_size, pad)
         return x
 

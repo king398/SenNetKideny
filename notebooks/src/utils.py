@@ -186,10 +186,14 @@ min_max = {
 }
 
 
-def norm_by_percentile(volume: np.array, xmin: float, xmax: float, alpha: float = 0.01):
+def norm_by_percentile(volume: np.array, low: int = 10, high: int = 99.8, alpha: int = 0.01):
+    xmin = np.percentile(volume, low)
+    xmax = np.percentile(volume, high)
     x = (volume - xmin) / (xmax - xmin)
-    x[x > 1] = (x[x > 1] - 1) * alpha + 1
-    x[x < 0] = (x[x < 0]) * alpha
+    if 1:
+        x[x > 1] = (x[x > 1] - 1) * alpha + 1
+        x[x < 0] = (x[x < 0]) * alpha
+    # x = np.clip(x,0,1)
     return x
 
 
@@ -207,7 +211,32 @@ def load_images_and_masks(directory: str, image_subdir: str, label_subdir: str, 
         return images_full_path, labels_full_path, kidneys_rle
     else:
         volume = np.stack([cv2.imread(i, cv2.IMREAD_GRAYSCALE).astype(np.float16) for i in tqdm(images_full_path)])
-        min_max_stats = min_max[kidney_rle_prefix]
 
-        return images_full_path, labels_full_path, kidneys_rle, norm_by_percentile(volume, xmin=min_max_stats["q_min"],
-                                                                                   xmax=min_max_stats["q_max"])
+        return images_full_path, labels_full_path, kidneys_rle, norm_by_percentile(volume)
+
+
+
+def calculate_false_positive(y_true, y_pred):
+    """
+    Calculate the false positive rate (percentage).
+
+    Args:
+    y_true (torch.Tensor): Ground truth labels.
+    y_pred (torch.Tensor): Predicted labels.
+
+    Returns:
+    float: False positive rate (percentage).
+    """
+
+    y_pred = torch.round(y_pred)
+
+    FP = torch.sum((y_true == 0) & (y_pred == 1))
+
+    TN = torch.sum((y_true == 0) & (y_pred == 0))
+
+    if FP + TN > 0:
+        FPR = FP / (FP + TN)
+    else:
+        FPR = torch.tensor(0.0)
+
+    return FPR.item() * 100  # Convert to percentage

@@ -1,3 +1,4 @@
+import torch
 from tqdm.auto import tqdm
 from torch.utils.data import DataLoader
 from utils import *
@@ -41,9 +42,8 @@ def train_fn(
         with accelerator.accumulate(model):
             masks = masks.float().contiguous()
             images = images.float().contiguous()
-            if random.random() > 0.5:
-                images, masks = CutMix(images, masks)
-                print("CutMix Done")
+            # if random.random() > 0.5:
+            #    images, masks = CutMix(images, masks)
             output = model(images)
             loss = criterion(output, masks)
             accelerator.backward(loss)
@@ -53,6 +53,7 @@ def train_fn(
             outputs, masks = accelerator.gather_for_metrics((output, masks))
             loss_metric += loss.item() / (i + 1)
             dice_batch = dice(outputs, masks)
+
             stream.set_description(
                 f"Epoch:{epoch + 1}, train_loss: {loss_metric:.5f}, dice_batch: {dice_batch.item():.5f}")
 
@@ -75,6 +76,8 @@ def validation_fn(
     stream = tqdm(valid_loader, total=len(valid_loader), disable=not accelerator.is_local_main_process, )
     loss_metric = 0
     pd_dataframes = [{"id": [], "rle": []} for _ in range(5)]
+    # create a dictionary with list from 0.1 to 0.5
+    false_positive_dict = {f"threshold_{m / 10}": [] for m in range(1, 6)}
     j = 0
     x = 0
     dice_list = []
@@ -107,10 +110,14 @@ def validation_fn(
 
                 for m, t in enumerate(threshold):
                     output_mask_new = output_mask.copy()
-                    output_mask_new = (output_mask_new > t).astype(np.uint8)
-                    rle_mask = rle_encode(output_mask_new)
+                    output_mask_new = (output_mask_new > t)
+                    false_positive = calculate_false_positive(y_true=masks[p, 0, :, :].detach().cpu(),
+                                                              y_pred=torch.tensor(
+                                                                  output_mask_new.astype(np.float32)))
+                    rle_mask = rle_encode(output_mask_new.astype(np.uint8))
                     pd_dataframes[m]["id"].append(image_ids[p])
                     pd_dataframes[m]["rle"].append(rle_mask)
+                    false_positive_dict[f"threshold_{t}"].append(false_positive)
                 j += 1
 
     threshold_score_dict = {}
@@ -121,12 +128,16 @@ def validation_fn(
         pd_dataframe = pd_dataframe.drop_duplicates(subset=['id'])
         surface_dice = compute_surface_dice_score(submit=pd_dataframe, label=labels_df)
         threshold_score_dict.update({f"threshold_{m / 10}": surface_dice})
+    fp_dict_mean = {k: np.mean(v) for k, v in false_positive_dict.items()}
     max_surface_dice = max(threshold_score_dict.values())
     best_threshold = list(threshold_score_dict.keys())[list(threshold_score_dict.values()).index(max_surface_dice)]
     dice_score = np.mean(dice_list)
+    lowest_false_positive = fp_dict_mean[best_threshold]
 
     accelerator.print(
-        f"Epoch:{epoch + 1}, valid_loss: {loss_metric:.5f} ,Dice Coefficient {dice_score},surface_dice: {max_surface_dice:.5f} ,threshold_score_dict   {threshold_score_dict} ")
+        f"Epoch:{epoch + 1}, valid_loss: {loss_metric:.5f} ,Dice Coefficient {dice_score},surface_dice: {max_surface_dice:.5f} , best_threshold: {best_threshold} , lowest_false_positive: {lowest_false_positive} ")
     accelerator.log(
-        {f"surface_dice": max_surface_dice, f"valid_loss": loss_metric, f"best_threshold": best_threshold, })
-    return dice_score, max_surface_dice
+        {f"surface_dice": max_surface_dice, f"valid_loss": loss_metric,
+
+         f"lowest_false_positive": lowest_false_positive, f"dice_score": dice_score})
+    return dice_score, max_surface_dice, lowest_false_positive
