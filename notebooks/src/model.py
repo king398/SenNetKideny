@@ -43,6 +43,7 @@ class ReturnModel(nn.Module):
         x = self._unpad(x, original_size, pad)
         return x
 
+
     def _pad_image(self, x: torch.Tensor, pad_factor: int = 224):
         h, w = x.shape[2], x.shape[3]
         h_pad = (pad_factor - h % pad_factor) % pad_factor
