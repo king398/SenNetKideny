@@ -59,12 +59,9 @@ class ReturnModel(nn.Module):
     def _unpad(self, x, original_size, pad):
         h, w = original_size
         return x[:, :, pad[2]:h + pad[2], pad[0]:w + pad[0]]
+    def central_crop(size):
+        return T.CenterCrop(size)
 
-    def _pad_image(x: torch.Tensor, h: int, w: int, pad_factor: int = 32):
-        h_pad = (pad_factor - h % pad_factor) % pad_factor
-        w_pad = (pad_factor - w % pad_factor) % pad_factor
-        pad = [w_pad // 2, w_pad - w_pad // 2, h_pad // 2, h_pad - h_pad // 2]
-        return nn.functional.pad(x, pad, mode='constant', value=0), pad
 
 
 
