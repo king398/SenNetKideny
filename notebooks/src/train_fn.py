@@ -42,7 +42,7 @@ def train_fn(
             masks = masks.float().contiguous()
             images = images.float().contiguous()
             images = get_mosaic_2x2(images)
-            
+            masks = get_mosaic_2x2(masks)
             output = model(images)
             loss = criterion(output, masks)
             accelerator.backward(loss)
