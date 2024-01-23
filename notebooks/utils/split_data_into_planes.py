@@ -5,7 +5,7 @@ from notebooks.src.utils import rle_decode, rle_encode
 
 import pandas as pd
 
-volume = "kidney_3_sparse"
+volume = "kidney_1_dense"
 data_dir = f"/home/mithil/PycharmProjects/SenNetKideny/data/train/{volume}"
 kidneys_rle = pd.read_csv("/home/mithil/PycharmProjects/SenNetKideny/data/train_rles_kidneys.csv")
 # convert kidney_rle to a dict
