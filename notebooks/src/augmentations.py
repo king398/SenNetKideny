@@ -2,6 +2,7 @@ from albumentations import Compose, CenterCrop
 from albumentations.pytorch import ToTensorV2
 import torch
 from torchvision.transforms import v2
+from torchvision.transforms import transforms as T
 
 
 def get_train_transform(height: int = 1344, width: int = 1120) -> Compose:
@@ -12,7 +13,20 @@ def get_train_transform(height: int = 1344, width: int = 1120) -> Compose:
         ToTensorV2(transpose_mask=True), ])
 
 
+def central_crop(size):
+    return T.CenterCrop(size)
 
+
+def get_mosaic_2x2(four_images_batch):
+    H, W = four_images_batch.shape[2:]
+    h, w = int(H // 2), int(W / 2)
+    cc = central_crop((h, w))
+    final = torch.zeros_like(four_images_batch[0])
+    for i in range(2):
+        for j in range(2):
+            im = cc(four_images_batch[i * 2 + j])
+            final[:, i * h:i * h + h, j * w:j * w + w] = im
+    return torch.cat([four_images_batch,final.unsqueeze(0)])
 
 def CutMix(images: torch.tensor, masks: torch.tensor):
     y = torch.randint(4, (images.shape[0],), dtype=torch.long)

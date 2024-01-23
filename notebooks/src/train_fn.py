@@ -7,7 +7,7 @@ from accelerate import Accelerator
 import pandas as pd
 from metric import compute_surface_dice_score
 from dataset import CombinedDataLoader
-from augmentations import CutMix
+from augmentations import get_mosaic_2x2
 
 dice = Dice()
 dice_valid = Dice_Valid()
@@ -41,6 +41,8 @@ def train_fn(
         with accelerator.accumulate(model):
             masks = masks.float().contiguous()
             images = images.float().contiguous()
+            images = get_mosaic_2x2(images)
+            
             output = model(images)
             loss = criterion(output, masks)
             accelerator.backward(loss)

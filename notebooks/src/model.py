@@ -8,6 +8,7 @@ from torch import nn
 import torch
 from torch.nn import functional as F
 
+from torchvision import transforms as T
 
 def return_model(model_name: str, in_channels: int, classes: int):
     model = smp.Unet(
@@ -35,7 +36,6 @@ class ReturnModel(nn.Module):
         self.pad_factor = pad_factor
 
     def forward(self, x, inference: bool = False):
-        # Pad the input
         original_size = x.shape[2:]
         x, pad = self._pad_image(x, pad_factor=self.pad_factor)
         x = checkpoint(self.unet.encoder, x, use_reentrant=True)
@@ -59,6 +59,14 @@ class ReturnModel(nn.Module):
     def _unpad(self, x, original_size, pad):
         h, w = original_size
         return x[:, :, pad[2]:h + pad[2], pad[0]:w + pad[0]]
+
+    def _pad_image(x: torch.Tensor, h: int, w: int, pad_factor: int = 32):
+        h_pad = (pad_factor - h % pad_factor) % pad_factor
+        w_pad = (pad_factor - w % pad_factor) % pad_factor
+        pad = [w_pad // 2, w_pad - w_pad // 2, h_pad // 2, h_pad - h_pad // 2]
+        return nn.functional.pad(x, pad, mode='constant', value=0), pad
+
+
 
 
 class ReturnModelDepth6(nn.Module):
