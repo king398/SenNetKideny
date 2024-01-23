@@ -6,11 +6,12 @@ import cv2
 from albumentations import Compose
 from typing import Tuple, List, Literal
 import torch
+import random
 
 
 class ImageDataset(Dataset):
     def __init__(self, image_paths: List[str], mask_paths: List[str], transform: Compose, kidney_rle: List[str],
-                 volume: np.array, mode: Literal["xy", "yz", "xz"] = "xy",):
+                 volume: np.array, mode: Literal["xy", "yz", "xz"] = "xy", ):
         self.image_paths = image_paths
         self.mask_paths = mask_paths
         self.kidney_rle = kidney_rle
@@ -26,8 +27,6 @@ class ImageDataset(Dataset):
                 return self.volume.shape[1]
             case "yz":
                 return self.volume.shape[2]
-
-
 
     def __getitem__(self, item) -> Tuple[torch.Tensor, torch.Tensor, str]:
         match self.mode:

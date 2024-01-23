@@ -186,10 +186,15 @@ min_max = {
 }
 
 
-def norm_by_percentile(volume: np.array, xmin: float, xmax: float, alpha: float = 0.01):
+
+def norm_by_percentile(volume, low=10, high=99.8, alpha=0.01):
+    xmin = np.percentile(volume, low)
+    xmax = np.percentile(volume, high)
     x = (volume - xmin) / (xmax - xmin)
-    x[x > 1] = (x[x > 1] - 1) * alpha + 1
-    x[x < 0] = (x[x < 0]) * alpha
+    if 1:
+        x[x > 1] = (x[x > 1] - 1) * alpha + 1
+        x[x < 0] = (x[x < 0]) * alpha
+    # x = np.clip(x,0,1)
     return x
 
 
@@ -207,7 +212,5 @@ def load_images_and_masks(directory: str, image_subdir: str, label_subdir: str, 
         return images_full_path, labels_full_path, kidneys_rle
     else:
         volume = np.stack([cv2.imread(i, cv2.IMREAD_GRAYSCALE).astype(np.float16) for i in tqdm(images_full_path)])
-        min_max_stats = min_max[kidney_rle_prefix]
 
-        return images_full_path, labels_full_path, kidneys_rle, norm_by_percentile(volume, xmin=min_max_stats["q_min"],
-                                                                                   xmax=min_max_stats["q_max"])
+        return images_full_path, labels_full_path, kidneys_rle, norm_by_percentile(volume)

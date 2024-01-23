@@ -122,7 +122,7 @@ def main(cfg):
             best_surface_dice = surface_dice
             accelerate.save(model_weights, f"{cfg['model_dir']}/model_best_surface_dice.pth")
             accelerate.print(f"Saved Model With Best Surface Dice Score {best_surface_dice}")
-        if epoch % 25 == 0:
+        if epoch  == 3:
             accelerate.save(model_weights, f"{cfg['model_dir']}/model_epoch_{epoch}.pth")
         accelerate.save(model_weights, f"{cfg['model_dir']}/model_last_epoch.pth")
     accelerate.end_training()
