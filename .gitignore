@@ -3,7 +3,9 @@
 /701.png
 /logs/
 /models
-/wandb
+/wandb/
 *.csv
 .idea/
 *.yaml
+/__pychache__/
+*.pth
