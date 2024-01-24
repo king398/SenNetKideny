@@ -515,18 +515,6 @@ def create_table_neighbour_code_to_surface_area(spacing_mm):
 
 
 def rle_decode(mask_rle: str, shape: tuple) -> np.array:
-    """
-    Decode rle string
-    https://www.kaggle.com/code/paulorzp/run-length-encode-and-decode/script
-    https://www.kaggle.com/stainsby/fast-tested-rle
-
-    Args:
-      mask_rle: run length (rle) as string
-      shape: (height, width) of the mask
-
-    Returns:
-      array[uint8], 1 - mask, 0 - background
-    """
     s = mask_rle.split()
     starts, lengths = [np.asarray(x, dtype=int) for x in (s[0:][::2], s[1:][::2])]
     starts -= 1

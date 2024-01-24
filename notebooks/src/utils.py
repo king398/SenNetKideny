@@ -1,16 +1,17 @@
-import gc
-
-from segmentation_models_pytorch.utils.metrics import Fscore
-from torch import nn
-import torch
 import os
-import numpy as np
+import cv2
+import yaml
+import torch
 import random
 import accelerate
-import yaml
-import cv2
-from skimage import filters
+import numpy as np
+import pandas as pd
+
+from torch import nn
 from tqdm import tqdm
+from skimage import filters
+from joblib import Parallel, delayed
+from segmentation_models_pytorch.utils.metrics import Fscore
 
 
 def get_color_escape(r, g, b, background=False):
@@ -68,6 +69,17 @@ def rle_encode(mask: np.array):
     return rle
 
 
+def rle_decode(mask_rle: str, shape: tuple) -> np.array:
+    s = mask_rle.split()
+    starts, lengths = [np.asarray(x, dtype=int) for x in (s[0:][::2], s[1:][::2])]
+    starts -= 1
+    ends = starts + lengths
+    img = np.zeros(shape[0] * shape[1], dtype=np.uint8)
+    for lo, hi in zip(starts, ends):
+        img[lo:hi] = 1
+    return img.reshape(shape)
+
+
 def apply_canny_threshold_in_chunk(x: np.array, low: float, high: float, chunk_size: int = 32):
     D, H, W = x.shape
     predict = np.zeros((D, H, W), np.uint8)
@@ -86,20 +98,6 @@ def apply_canny_threshold_in_chunk(x: np.array, low: float, high: float, chunk_s
     return predict
 
 
-def rle_decode(mask_rle: str, img_shape: tuple = None) -> np.ndarray:
-    seq = mask_rle.split()
-    starts = np.array(list(map(int, seq[0::2])))
-    lengths = np.array(list(map(int, seq[1::2])))
-    assert len(starts) == len(lengths)
-    ends = starts + lengths
-    img = np.zeros((np.product(img_shape),), dtype=np.uint8)
-    for begin, end in zip(starts, ends):
-        img[begin:end] = 1
-    # https://stackoverflow.com/a/46574906/4521646
-    img.shape = img_shape
-    return img
-
-
 def remove_small_objects(mask, min_size):
     # Find all connected components (labels)
     num_label, label, stats, centroid = cv2.connectedComponentsWithStats(mask, connectivity=8)
@@ -109,7 +107,6 @@ def remove_small_objects(mask, min_size):
     for l in range(1, num_label):
         if stats[l, cv2.CC_STAT_AREA] >= min_size:
             processed[label == l] = 255
-
     return processed
 
 
@@ -127,17 +124,6 @@ def choose_biggest_object(mask, threshold):
 
 
 def apply_hysteresis_thresholding(volume: np.array, low: float, high: float, chunk_size: int = 32):
-    """
-    Applies hysteresis thresholding to a 3D numpy array.
-
-    :param volume: 3D numpy array.
-    :param low: Low threshold.
-    :param high: High threshold.
-    :param chunk_size: Size of the chunks to process at once.
-    :return: Thresholded volume.
-    """
-    # Apply hysteresis thresholding to each slice in the volume
-
     D, H, W = volume.shape
     predict = np.zeros((D, H, W), np.uint8)
 
@@ -146,7 +132,6 @@ def apply_hysteresis_thresholding(volume: np.array, low: float, high: float, chu
             filters.apply_hysteresis_threshold(volume[i:i + chunk_size], low, high),
             predict[i:i + chunk_size]
         )
-
     return predict
 
 
@@ -186,31 +171,37 @@ min_max = {
 }
 
 
-
 def norm_by_percentile(volume, low=10, high=99.8, alpha=0.01):
-    xmin = np.percentile(volume, low)
-    xmax = np.percentile(volume, high)
-    x = (volume - xmin) / (xmax - xmin)
-    if 1:
-        x[x > 1] = (x[x > 1] - 1) * alpha + 1
-        x[x < 0] = (x[x < 0]) * alpha
-    # x = np.clip(x,0,1)
+    q_min = np.percentile(volume, low)
+    q_max = np.percentile(volume, high)
+    x = (volume - q_min) / (q_max - q_min)
+    x[x > 1] = (x[x > 1] - 1) * alpha + 1
+    x[x < 0] = (x[x < 0]) * alpha
     return x
 
 
-def load_images_and_masks(directory: str, image_subdir: str, label_subdir: str, kidney_rle: dict,
-                          kidney_rle_prefix: str):
-    image_dir = os.path.join(directory, image_subdir)
-    label_dir = os.path.join(directory, label_subdir)
+def read_cv2(fp):
+    return cv2.imread(fp, cv2.IMREAD_GRAYSCALE).astype(np.float16)
 
-    image_files = sorted(os.listdir(image_dir))
-    images_full_path = [os.path.join(image_dir, f) for f in image_files]
-    labels_full_path = [f.replace(image_subdir, label_subdir) for f in images_full_path]
 
-    kidneys_rle = [kidney_rle[f"{kidney_rle_prefix}_{f.split('.')[0]}"] for f in image_files]
-    if "xz" in directory or "yz" in directory:
-        return images_full_path, labels_full_path, kidneys_rle
+def load_images_and_masks(cfg, kidney_name: str):
+    csv = pd.read_csv(cfg['csv_image_mask_paths'])
+    if "xz" in kidney_name or "yz" in kidney_name:
+        csv = csv[csv.id.str.contains(kidney_name)]
+        images_paths = csv.img_path.tolist()
+        masks_paths = csv.mask_path.tolist()
+        kid_masks_paths = csv.rle_path.tolist()
+        return images_paths, masks_paths, kid_masks_paths
     else:
-        volume = np.stack([cv2.imread(i, cv2.IMREAD_GRAYSCALE).astype(np.float16) for i in tqdm(images_full_path)])
+        csv = csv[csv.id.str.contains(kidney_name) & ~csv.id.str.contains('xz|yz')]
+        images_paths = csv.img_path.tolist()
+        masks_paths = csv.mask_path.tolist()
+        kid_masks_paths = csv.rle_path.tolist()
 
-        return images_full_path, labels_full_path, kidneys_rle, norm_by_percentile(volume)
+        desc = 'reading and stacking images in volume...'
+        if kidney_name in cfg['cub1_path_percentile']:
+            volume = np.load(cfg['cub1_path_percentile']).squeeze(3).transpose(2, 0, 1)
+        else:
+            volume = np.load(cfg['cub3_path_percentile']).squeeze(3).transpose(2, 0, 1)
+        # volume = np.stack([read_cv2(fp) for fp in tqdm(images_paths, total=len(images_paths), desc=desc)])
+        return images_paths, masks_paths, kid_masks_paths, volume

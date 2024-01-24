@@ -1,16 +1,16 @@
-import numpy as np
-
-from utils import rle_decode
-from torch.utils.data import Dataset
 import cv2
-from albumentations import Compose
-from typing import Tuple, List, Literal
 import torch
 import random
+import numpy as np
+
+from albumentations import Compose
+from torch.utils.data import Dataset
+from typing import Tuple, List, Literal
 
 
 class ImageDataset(Dataset):
-    def __init__(self, image_paths: List[str], mask_paths: List[str], transform: Compose, kidney_rle: List[str],
+    def __init__(self, image_paths: List[str], mask_paths: List[str],
+                 transform: Compose, kidney_rle: List[str],
                  volume: np.array, mode: Literal["xy", "yz", "xz"] = "xy", ):
         self.image_paths = image_paths
         self.mask_paths = mask_paths
@@ -18,6 +18,7 @@ class ImageDataset(Dataset):
         self.transform = transform
         self.volume = volume
         self.mode = mode
+        print('dataset is initialized')
 
     def __len__(self) -> int:
         match self.mode:
@@ -33,19 +34,18 @@ class ImageDataset(Dataset):
             case "xy":
                 image = self.volume[item].astype(np.float32)
             case "xz":
-                image = self.volume[:, item].astype(np.float32)
+                image = self.volume[:, item].astype(np.float32).transpose(1, 0)
             case "yz":
-                image = self.volume[:, :, item].astype(np.float32)
+                image = self.volume[:, :, item].astype(np.float32).transpose(1, 0)
             case _:
                 raise ValueError("Invalid mode")
 
         image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
 
-        mask = cv2.imread(self.mask_paths[item])
-        mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
-        mask = mask / 255
-        kidney_mask = rle_decode(self.kidney_rle[item], img_shape=mask.shape)
+        mask = cv2.imread(self.mask_paths[item], cv2.COLOR_BGR2GRAY) / 255
+        kidney_mask = cv2.imread(self.kidney_rle[item], cv2.COLOR_BGR2GRAY) / 255
         mask = np.stack([mask, kidney_mask], axis=2)
+
         augmented = self.transform(image=image, mask=mask)
         image = augmented["image"]
         mask = augmented["mask"]
@@ -113,7 +113,6 @@ class CombinedDataLoader:
         # Randomly pick a dataloader
         dataloader = random.choice(self.iterators)
 
-        # Try to fetch the next batch from this dataloader
         try:
             batch = next(dataloader)
         except StopIteration:
@@ -127,3 +126,15 @@ class CombinedDataLoader:
 
     def __len__(self):
         return sum(len(dataloader) for dataloader in self.dataloaders)
+
+
+if __name__ == '__main__':
+    from utils import load_images_and_masks
+    import yaml
+    from augmentations import get_fit_transform
+
+    with open('config.yaml') as f:
+        cfg = yaml.load(f, Loader=yaml.FullLoader)
+    fit_images, fit_masks, fit_kidneys_rle, fit_volume = load_images_and_masks(cfg, kidney_name='kidney_1_dense')
+    fit_dataset = ImageDataset(fit_images, fit_masks, get_fit_transform(), fit_kidneys_rle, fit_volume, mode="xy")
+    print()
