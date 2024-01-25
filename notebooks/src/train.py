@@ -66,8 +66,10 @@ def main(cfg):
     model = ReturnModel(cfg['model_name'], in_channels=cfg['in_channels'], classes=cfg['classes'],
                         pad_factor=cfg['pad_factor'])
     optimizer = torch.optim.AdamW(model.parameters(), lr=(float(cfg['lr'])))
-    T_max = ceil(len(fit_images + fit_images_xz + fit_images_yz) /
-                 (cfg['num_devices'] * cfg['batch_size'])) * cfg['epochs']
+
+    T_max = int((len(fit_loader) + len(fit_loader_yz) + len(fit_loader_xz)) * 20)
+    # T_max = ceil(len(fit_images + fit_images_xz + fit_images_yz) /
+    #              (cfg['num_devices'] * cfg['batch_size'])) * cfg['epochs']
     scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=T_max, eta_min=float(cfg['min_lr']))
     (fit_loader, val_loader, model, optimizer, scheduler, fit_loader_yz, fit_loader_xz,
      ) = accelerate.prepare(
@@ -92,7 +94,6 @@ def main(cfg):
             fold=0,
             accelerator=accelerate,
             ema=ema
-
         )
 
         dice_score, surface_dice = validation_fn(
@@ -103,8 +104,7 @@ def main(cfg):
             accelerator=accelerate,
             labels_df=labels_df,
             model_dir=cfg['model_dir'],
-            ema=ema
-
+            ema=ema,
         )
         accelerate.wait_for_everyone()
         unwrapped_model = accelerate.unwrap_model(model)

@@ -59,10 +59,12 @@ def train_fn(
             loss_metric += loss.item() / (i + 1)
             dice_batch = dice(outputs, masks)
             stream.set_description(
-                f"Epoch:{epoch + 1}, train_loss: {loss_metric:.5f}, dice_batch: {dice_batch.item():.5f}")
-
+                f"Epoch:{epoch + 1}, train_loss: {loss_metric:.5f}, dice_batch: {dice_batch.item():.5f}"
+            )
             accelerator.log({f"train_loss_{fold}": loss_metric, f"train_dice_batch_{fold}": dice_batch.item(),
                              f"lr_{fold}": optimizer.param_groups[0]['lr']})
+
+    accelerator.log({f"f{fold}-train_lr": optimizer.param_groups[0]['lr']})
 
 
 def validation_fn(
@@ -134,5 +136,5 @@ def validation_fn(
     accelerator.print(
         f"Epoch:{epoch + 1}, valid_loss: {loss_metric:.5f} ,Dice Coefficient {dice_score},surface_dice: {max_surface_dice:.5f} ,threshold_score_dict   {threshold_score_dict} ")
     accelerator.log(
-        {f"surface_dice": max_surface_dice, f"valid_loss": loss_metric, f"best_threshold": best_threshold, })
+        {f"surface_dice": max_surface_dice, f"valid_loss": loss_metric, f"best_threshold": float(best_threshold[-3:])})
     return dice_score, max_surface_dice
