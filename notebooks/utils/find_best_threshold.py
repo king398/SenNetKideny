@@ -8,7 +8,7 @@ import yaml
 
 solution_df = pd.read_csv("/home/mithil/PycharmProjects/SenNetKideny/data/kidney_3_dense_full.csv")
 
-model_dir = "seresnext101d_32x8d_flip_no_checkpointing_bce_loss"
+model_dir = "dm_nfnet_f2_volume_normalize_dice_find_best_epoch"
 submission_df = pd.read_csv(f"/home/mithil/PycharmProjects/SenNetKideny/models/{model_dir}/oof_csv.csv")[496:997].reset_index(drop=True)
 submission_df['id'] = submission_df['id'].apply(lambda x: x.replace('sparse', 'dense'))
 ids = submission_df['id'].values

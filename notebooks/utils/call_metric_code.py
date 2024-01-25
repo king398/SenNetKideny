@@ -4,7 +4,7 @@ import numpy as np
 
 solution_df = pd.read_csv("/home/mithil/PycharmProjects/SenNetKideny/data/kidney_3_dense_full.csv")
 
-model_dir = "maxvit_base_tf_224_volume_normalize_dice_50_epoch"
+model_dir = "dm_nfnet_f2_volume_normalize_dice_find_best_epoch"
 submission_df = pd.read_csv(f"/home/mithil/PycharmProjects/SenNetKideny/models/{model_dir}/oof_csv.csv")
 # submission_df = pd.rea    d_csv(f"/home/mithil/PycharmProjects/SenNetKideny/submission.csv")
 # replace sparse with dense

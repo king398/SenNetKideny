@@ -182,14 +182,14 @@ def main(cfg: dict):
 
 config = {
     "seed": 42,
-    "model_name": "tu-timm/maxvit_base_tf_224.in1k",
+    "model_name": "tu-timm/dm_nfnet_f2.dm_in1k",
     "in_channels": 3,
     "classes": 2,
     # "test_dir": '/kaggle/input/blood-vessel-segmentation/test',
-    "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/maxvit_base_tf_224_volume_normalize_dice_50_epoch/model_best_surface_dice.pth",
-    "batch_size": 1,
+    "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/dm_nfnet_f2_volume_normalize_dice_find_best_epoch/model_best_surface_dice.pth",
+    "batch_size": 2,
     "num_workers": 8,
-    "pad_factor": 224,
+    "pad_factor": 32,
 }
 if __name__ == "__main__":
     main(config)

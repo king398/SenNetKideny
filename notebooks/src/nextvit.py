@@ -452,17 +452,15 @@ class NextViT(nn.Module):
                 if hasattr(m, 'bias') and m.bias is not None:
                     nn.init.constant_(m.bias, 0)
 
-    def forward(self, x,inference=True):
+    def forward(self, x):
         outputs = list()
         outputs.append(x)
-
-        xx = self.stem[0](x)
-        outputs.append(xx)
-        x = self.stem[1](xx)
+        x = self.stem[0](x)
+        outputs.append(x)
+        x = self.stem[1](x)
         x = self.stem[2](x)
         x = self.stem[3](x)
         stage_id = 0
-
         for idx, layer in enumerate(self.features):
             if self.use_checkpoint:
                 x = checkpoint.checkpoint(layer, x)
@@ -491,8 +489,8 @@ def nextvit_small(pretrained=False, pretrained_cfg=None, **kwargs):
 @register_model
 def nextvit_base(pretrained=False, pretrained_cfg=None, **kwargs):
     model = NextViT(stem_chs=[64, 32, 64], depths=[3, 4, 20, 3], path_dropout=0.2, use_checkpoint=False,
-                    resume="/home/mithil/PycharmProjects/SenNetKideny/models/nexvit_pretrained/fpn_80k_nextvit_base_1n1k6m_pretrained.pth"
-                    , **kwargs)
+                    resume="/home/mithil/PycharmProjects/SenNetKideny/models/nexvit_pretrained/fpn_80k_nextvit_base_1n1k6m_pretrained.pth",
+                    **kwargs)
     return model
 
 

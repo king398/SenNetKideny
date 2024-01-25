@@ -37,7 +37,8 @@ class ReturnModel(nn.Module):
         original_size = x.shape[2:]
         x, pad = self._pad_image(x, pad_factor=self.pad_factor)
         x = checkpoint(self.unet.encoder, x, use_reentrant=True)
-
+        for i in x:
+            print(i.shape)
         x = self.unet.decoder(*x)
         x = self.unet.segmentation_head(x)
         x = self._unpad(x, original_size, pad)
@@ -148,6 +149,8 @@ class ReturnModelNextVit(nn.Module):
         original_size = x.shape[2:]
         x, pad = self._pad_image(x, pad_factor=self.pad_factor)
         features = checkpoint(self.encoder, x)
+        for i in features:
+            print(i.shape)
         x = self.decoder(*features)
         x = self.segmentation_head(x)
         x = self._unpad(x, original_size, pad)
