@@ -8,7 +8,8 @@ from accelerate import Accelerator
 import pandas as pd
 from metric import compute_surface_dice_score
 from dataset import CombinedDataLoader
-from augmentations import get_mosaic_2x2
+from augmentations import get_mosaic_2x2, get_mosaic_2x2_8
+from torch_ema import ExponentialMovingAverage
 
 dice = Dice()
 dice_valid = Dice_Valid()
@@ -27,6 +28,7 @@ def train_fn(
         scheduler: optim.lr_scheduler.LRScheduler,
         epoch: int,
         accelerator: Accelerator,
+        ema,
         fold: int,
 
 ):
@@ -42,14 +44,17 @@ def train_fn(
         with accelerator.accumulate(model):
             masks = masks.float().contiguous()
             images = images.float().contiguous()
-            images = get_mosaic_2x2(images)
-            masks = get_mosaic_2x2(masks)
+            # images = get_mosaic_2x2(images)
+            # masks = get_mosaic_2x2(masks)
+            images = get_mosaic_2x2_8(images)
+            masks = get_mosaic_2x2_8(masks)
             output = model(images)
             loss = criterion(output, masks)
             accelerator.backward(loss)
             optimizer.step()
             optimizer.zero_grad()
             scheduler.step()
+            ema.update()
             outputs, masks = accelerator.gather_for_metrics((output, masks))
             loss_metric += loss.item() / (i + 1)
             dice_batch = dice(outputs, masks)
@@ -67,6 +72,7 @@ def validation_fn(
         epoch: int,
         accelerator: Accelerator,
         labels_df: pd.DataFrame,
+        ema,
         model_dir: str,
 ):
     gc.collect()
@@ -83,35 +89,35 @@ def validation_fn(
 
             masks = masks.float()
             images = images.float().to(accelerator.device)
+            with ema.average_parameters():
+                output = model(images, )
+                loss = criterion(output, masks)
+                outputs, masks, = accelerator.gather((output, masks,))
+                image_ids = accelerator.gather_for_metrics(image_ids)
+                loss_metric += loss.item() / (i + 1)
+                outputs = outputs.sigmoid()
+                outputs_not_multiply = outputs.detach().clone()
+                stream.set_description(
+                    f"Epoch:{epoch + 1}, valid_loss: {loss_metric:.5f}")
+                outputs_not_multiply = outputs_not_multiply.detach().cpu().float().numpy()
+                outputs = outputs[:, 0, :, :] * outputs[:, 1, :, :]
+                dice_batch = dice_valid(outputs, masks[:, 0, :, :])
+                dice_list.append(dice_batch.item())
 
-            output = model(images, )
-            loss = criterion(output, masks)
-            outputs, masks, = accelerator.gather((output, masks,))
-            image_ids = accelerator.gather_for_metrics(image_ids)
-            loss_metric += loss.item() / (i + 1)
-            outputs = outputs.sigmoid()
-            outputs_not_multiply = outputs.detach().clone()
-            stream.set_description(
-                f"Epoch:{epoch + 1}, valid_loss: {loss_metric:.5f}")
-            outputs_not_multiply = outputs_not_multiply.detach().cpu().float().numpy()
-            outputs = outputs[:, 0, :, :] * outputs[:, 1, :, :]
-            dice_batch = dice_valid(outputs, masks[:, 0, :, :])
-            dice_list.append(dice_batch.item())
+                for p, image, in enumerate(outputs_not_multiply, ):
+                    kidney = image[1, :, :]
+                    kidney = choose_biggest_object(kidney, 0.5)
+                    output_mask = image[0, :, :] * kidney
+                    # iterate from threshold 0.1 to 0.5
+                    threshold = [0.1, 0.2, 0.3, 0.4, 0.5]
 
-            for p, image, in enumerate(outputs_not_multiply, ):
-                kidney = image[1, :, :]
-                kidney = choose_biggest_object(kidney, 0.5)
-                output_mask = image[0, :, :] * kidney
-                # iterate from threshold 0.1 to 0.5
-                threshold = [0.1, 0.2, 0.3, 0.4, 0.5]
-
-                for m, t in enumerate(threshold):
-                    output_mask_new = output_mask.copy()
-                    output_mask_new = (output_mask_new > t).astype(np.uint8)
-                    rle_mask = rle_encode(output_mask_new)
-                    pd_dataframes[m]["id"].append(image_ids[p])
-                    pd_dataframes[m]["rle"].append(rle_mask)
-                j += 1
+                    for m, t in enumerate(threshold):
+                        output_mask_new = output_mask.copy()
+                        output_mask_new = (output_mask_new > t).astype(np.uint8)
+                        rle_mask = rle_encode(output_mask_new)
+                        pd_dataframes[m]["id"].append(image_ids[p])
+                        pd_dataframes[m]["rle"].append(rle_mask)
+                    j += 1
 
     threshold_score_dict = {}
     for m, pd_dataframe in enumerate(pd_dataframes):

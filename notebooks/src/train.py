@@ -11,6 +11,7 @@ from model import ReturnModel
 from dataset import ImageDataset
 from torch.utils.data import DataLoader
 from train_fn import train_fn, validation_fn
+from torch_ema import ExponentialMovingAverage
 from segmentation_models_pytorch.losses import DiceLoss
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 from accelerate import Accelerator, DistributedDataParallelKwargs
@@ -27,7 +28,8 @@ def main(cfg):
     gc.enable()
     accelerate = Accelerator(
         mixed_precision="fp16", log_with=["wandb"],
-        kwargs_handlers=[DistributedDataParallelKwargs(gradient_as_bucket_view=True, find_unused_parameters=True, ), ],
+        kwargs_handlers=[DistributedDataParallelKwargs(gradient_as_bucket_view=True,
+                                                       find_unused_parameters=True, ), ],
         project_dir="logs",
         gradient_accumulation_steps=cfg['gradient_accumulation_steps'],
     )
@@ -55,7 +57,7 @@ def main(cfg):
                          'num_workers': cfg['num_workers'], 'pin_memory': True}
 
     fit_loader = DataLoader(fit_dataset, **fit_loader_kwargs)
-    fit_loader_xz = DataLoader(fit_dataset_xz,  **fit_loader_kwargs)
+    fit_loader_xz = DataLoader(fit_dataset_xz, **fit_loader_kwargs)
     fit_loader_yz = DataLoader(fit_dataset_yz, **fit_loader_kwargs)
 
     fit_loader_kwargs['shuffle'] = False
@@ -77,6 +79,7 @@ def main(cfg):
     criterion = DiceLoss(mode="multilabel")
     # remove all the rows which do not contain kidney_3_dense in the id column
     labels_df = pd.read_csv(cfg['labels_df'])
+    ema = ExponentialMovingAverage(model.parameters(), decay=0.995)
 
     for epoch in range(cfg['epochs']):
         train_fn(
@@ -88,6 +91,7 @@ def main(cfg):
             epoch=epoch,
             fold=0,
             accelerator=accelerate,
+            ema=ema
 
         )
 
@@ -99,6 +103,7 @@ def main(cfg):
             accelerator=accelerate,
             labels_df=labels_df,
             model_dir=cfg['model_dir'],
+            ema=ema
 
         )
         accelerate.wait_for_everyone()
@@ -123,6 +128,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--config', type=Path, default='config.yaml')
     args = parser.parse_args()
+
     with open(args.config) as f:
         cfg = yaml.load(f, Loader=yaml.FullLoader)
     os.makedirs(cfg['model_dir'], exist_ok=True)
