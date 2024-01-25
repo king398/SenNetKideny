@@ -37,8 +37,6 @@ class ReturnModel(nn.Module):
         original_size = x.shape[2:]
         x, pad = self._pad_image(x, pad_factor=self.pad_factor)
         x = checkpoint(self.unet.encoder, x, use_reentrant=True)
-        for i in x:
-            print(i.shape)
         x = self.unet.decoder(*x)
         x = self.unet.segmentation_head(x)
         x = self._unpad(x, original_size, pad)
@@ -127,7 +125,7 @@ class ReturnModelNextVit(nn.Module):
         # Initialize the Unet model
         if not model_name.startswith("nextvit"):
             raise ValueError("This Class is only for NextVit models")
-        self.decoder_channels = (1024, 512, 256, 96, 64)
+        self.decoder_channels = (256, 128, 64, 32, 16)
         self.encoder = timm.create_model(model_name)
         self.decoder = UnetDecoder(
             decoder_channels=self.decoder_channels,
@@ -149,8 +147,6 @@ class ReturnModelNextVit(nn.Module):
         original_size = x.shape[2:]
         x, pad = self._pad_image(x, pad_factor=self.pad_factor)
         features = checkpoint(self.encoder, x)
-        for i in features:
-            print(i.shape)
         x = self.decoder(*features)
         x = self.segmentation_head(x)
         x = self._unpad(x, original_size, pad)

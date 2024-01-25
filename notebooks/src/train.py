@@ -9,7 +9,7 @@ from dataset import ImageDataset
 from pathlib import Path
 from augmentations import get_train_transform, get_valid_transform
 from torch.utils.data import DataLoader
-from model import ReturnModel
+from model import ReturnModelNextVit
 import torch
 from train_fn import train_fn, validation_fn
 import argparse
@@ -67,7 +67,7 @@ def main(cfg):
     valid_loader = DataLoader(valid_dataset, batch_size=cfg['batch_size'], shuffle=False,
                               num_workers=cfg['num_workers'], pin_memory=True)
 
-    model = ReturnModel(cfg['model_name'], in_channels=cfg['in_channels'], classes=cfg['classes'],
+    model = ReturnModelNextVit(cfg['model_name'], in_channels=cfg['in_channels'], classes=cfg['classes'],
                         pad_factor=cfg['pad_factor'], )
     optimizer = torch.optim.AdamW(model.parameters(), lr=float(cfg['lr']))
     scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=int(
