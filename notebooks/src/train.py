@@ -13,6 +13,7 @@ from torch.utils.data import DataLoader
 from train_fn import train_fn, validation_fn
 from torch_ema import ExponentialMovingAverage
 from segmentation_models_pytorch.losses import DiceLoss
+from losses import GenSurfLoss
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 from accelerate import Accelerator, DistributedDataParallelKwargs
 from augmentations import get_fit_transform, get_val_transform
@@ -67,9 +68,9 @@ def main(cfg):
                         pad_factor=cfg['pad_factor'])
     optimizer = torch.optim.AdamW(model.parameters(), lr=(float(cfg['lr'])))
 
-    T_max = int((len(fit_loader) + len(fit_loader_yz) + len(fit_loader_xz)) * 20)
-    # T_max = ceil(len(fit_images + fit_images_xz + fit_images_yz) /
-    #              (cfg['num_devices'] * cfg['batch_size'])) * cfg['epochs']
+    # T_max = int((len(fit_loader) + len(fit_loader_yz) + len(fit_loader_xz)) * 10)
+    T_max = ceil(len(fit_images + fit_images_xz + fit_images_yz) /
+                 (cfg['num_devices'] * cfg['batch_size'])) * cfg['epochs']
     scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=T_max, eta_min=float(cfg['min_lr']))
     (fit_loader, val_loader, model, optimizer, scheduler, fit_loader_yz, fit_loader_xz,
      ) = accelerate.prepare(

@@ -7,7 +7,7 @@ kidneys_df: /home/lasupreme/Desktop/python/personal/KAGGLE-VS/SenNetKideny/data/
 labels_df: /home/lasupreme/Desktop/python/personal/KAGGLE-VS/SenNetKideny/data/kidney_3_dense_full_self_encode.csv
 lr: 8e-04
 min_lr: 6e-05
-model_dir: /home/lasupreme/Desktop/python/personal/KAGGLE-VS/SenNetKideny/models/EXP11
+model_dir: /home/lasupreme/Desktop/python/personal/KAGGLE-VS/SenNetKideny/models/EXP15
 model_name: tu-timm/maxvit_base_tf_224.in1k
 num_workers: 4
 pad_factor: 224

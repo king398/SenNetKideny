@@ -9,7 +9,6 @@ import pandas as pd
 from metric import compute_surface_dice_score
 from dataset import CombinedDataLoader
 from augmentations import get_mosaic_2x2, get_mosaic_2x2_8
-from torch_ema import ExponentialMovingAverage
 
 dice = Dice()
 dice_valid = Dice_Valid()
@@ -48,7 +47,7 @@ def train_fn(
             # masks = get_mosaic_2x2(masks)
             images = get_mosaic_2x2_8(images)
             masks = get_mosaic_2x2_8(masks)
-            output = model(images)
+            output = torch.special.expm1(model(images))
             loss = criterion(output, masks)
             accelerator.backward(loss)
             optimizer.step()
@@ -92,7 +91,7 @@ def validation_fn(
             masks = masks.float()
             images = images.float().to(accelerator.device)
             with ema.average_parameters():
-                output = model(images, )
+                output = torch.expm1(model(images, ))
                 loss = criterion(output, masks)
                 outputs, masks, = accelerator.gather((output, masks,))
                 image_ids = accelerator.gather_for_metrics(image_ids)
