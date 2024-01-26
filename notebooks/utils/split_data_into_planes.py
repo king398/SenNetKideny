@@ -5,7 +5,7 @@ from notebooks.src.utils import rle_decode, rle_encode
 
 import pandas as pd
 
-volume = "kidney_1_dense"
+volume = "kidney_3_sparse"
 data_dir = f"/home/mithil/PycharmProjects/SenNetKideny/data/train/{volume}"
 kidneys_rle = pd.read_csv("/home/mithil/PycharmProjects/SenNetKideny/data/train_rles_kidneys.csv")
 # convert kidney_rle to a dict
@@ -23,6 +23,11 @@ for i in range(len(os.listdir(f'{data_dir}/labels/'))):
     images.append(v)
     kidney_masks.append(rle_decode(kidneys_rle['kidney_rle'][i], img_shape=v.shape))
 masks = np.stack(masks)
+# dense mask to be loaded from the disk
+masks_dense = np.stack([cv2.imread(
+    f"/home/mithil/PycharmProjects/SenNetKideny/data/train/kidney_3_dense/labels/{i:04d}.tif", cv2.IMREAD_GRAYSCALE) for
+    i in range(496, 997)])
+masks[496:997] = masks_dense
 images = np.stack(images)
 kidney_masks = np.stack(kidney_masks)
 dataset_xz = (images, masks, kidney_masks)
@@ -34,15 +39,15 @@ os.makedirs(f"/home/mithil/PycharmProjects/SenNetKideny/data/train/{volume}_yz/l
 for p in range(images.shape[1]):
     cv2.imwrite(f"/home/mithil/PycharmProjects/SenNetKideny/data/train/{volume}_xz/images/{p:04d}.tif",
                 images[:, p])
-    cv2.imwrite(f"/home/mithil/PycharmProjects/SenNetKideny/data/train/{volume}_xz/labels/{p:04d}.tif",
-                masks[:, p])
-    kidneys_rle_dict.update({f"{volume}_xz_{p:04d}": rle_encode(kidney_masks[:, p])})
+cv2.imwrite(f"/home/mithil/PycharmProjects/SenNetKideny/data/train/{volume}_xz/labels/{p:04d}.tif",
+            masks[:, p])
+kidneys_rle_dict.update({f"{volume}_xz_{p:04d}": rle_encode(kidney_masks[:, p])})
 for p in range(images.shape[2]):
     cv2.imwrite(f"/home/mithil/PycharmProjects/SenNetKideny/data/train/{volume}_yz/images/{p:04d}.tif",
                 images[:, :, p])
-    cv2.imwrite(f"/home/mithil/PycharmProjects/SenNetKideny/data/train/{volume}_yz/labels/{p:04d}.tif",
-                masks[:, :, p])
-    kidneys_rle_dict.update({f"{volume}_yz_{p:04d}": rle_encode(kidney_masks[:, :, p])})
+cv2.imwrite(f"/home/mithil/PycharmProjects/SenNetKideny/data/train/{volume}_yz/labels/{p:04d}.tif",
+            masks[:, :, p])
+kidneys_rle_dict.update({f"{volume}_yz_{p:04d}": rle_encode(kidney_masks[:, :, p])})
 
 kidneys_rle_dict = pd.DataFrame(kidneys_rle_dict.items(), columns=['id', 'kidney_rle'])
 kidneys_rle_dict.to_csv(f"/home/mithil/PycharmProjects/SenNetKideny/data/train_rles_kidneys.csv", index=False)

@@ -186,7 +186,6 @@ min_max = {
 }
 
 
-
 def norm_by_percentile(volume, low=10, high=99.8, alpha=0.01):
     xmin = np.percentile(volume, low)
     xmax = np.percentile(volume, high)
@@ -202,8 +201,10 @@ def load_images_and_masks(directory: str, image_subdir: str, label_subdir: str, 
                           kidney_rle_prefix: str):
     image_dir = os.path.join(directory, image_subdir)
     label_dir = os.path.join(directory, label_subdir)
-
     image_files = sorted(os.listdir(image_dir))
+    if kidney_rle_prefix == 'kidney_2':
+        image_files = image_files[900:]
+
     images_full_path = [os.path.join(image_dir, f) for f in image_files]
     labels_full_path = [f.replace(image_subdir, label_subdir) for f in images_full_path]
 

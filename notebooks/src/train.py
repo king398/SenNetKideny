@@ -9,11 +9,13 @@ from dataset import ImageDataset
 from pathlib import Path
 from augmentations import get_train_transform, get_valid_transform
 from torch.utils.data import DataLoader
-from model import ReturnModelNextVit
+from model import ReturnModel
 import torch
 from train_fn import train_fn, validation_fn
 import argparse
 from segmentation_models_pytorch.losses import DiceLoss
+
+
 def main(cfg):
     warnings.filterwarnings("ignore")
     seed_everything(cfg['seed'])
@@ -33,7 +35,7 @@ def main(cfg):
 
     # Load validation images and masks
     validation_images, validation_masks, validation_kidneys_rle, validation_volume = load_images_and_masks(
-        cfg['validation_dir'], 'images', 'labels', kidney_rle, 'kidney_3_dense'
+        cfg['validation_dir'], 'images', 'labels', kidney_rle, 'kidney_2'
     )
 
     # Load train images and masks for train_dir_2
@@ -47,8 +49,14 @@ def main(cfg):
     train_images_yz, train_masks_yz, train_yz_kidneys_rle = load_images_and_masks(
         cfg['train_dir'] + '_yz', 'images', 'labels', kidney_rle, 'kidney_1_dense_yz'
     )
+    train_images_2, train_masks_2, train_kidneys_rle_2, train_volume_2 = load_images_and_masks(
+        cfg['train_dir_2'], 'images', 'labels', kidney_rle, 'kidney_3_sparse'
+    )
+    train_images_2_xz, train_masks_2_xz, train_xz_kidneys_rle_2 = load_images_and_masks(
+        cfg['train_dir_2'] + '_xz', 'images', 'labels', kidney_rle, 'kidney_3_sparse_xz')
+    train_images_2_yz, train_masks_2_yz, train_yz_kidneys_rle_2 = load_images_and_masks(
+        cfg['train_dir_2'] + '_yz', 'images', 'labels', kidney_rle, 'kidney_3_sparse_yz')
 
-    # Load train images and masks for train_dir_2_xz
     train_dataset = ImageDataset(train_images, train_masks, get_train_transform(), train_kidneys_rle, train_volume,
                                  mode="xy")
     valid_dataset = ImageDataset(validation_images, validation_masks, get_valid_transform(),
@@ -57,6 +65,12 @@ def main(cfg):
                                     train_xz_kidneys_rle, train_volume, mode="xz")
     train_dataset_yz = ImageDataset(train_images_yz, train_masks_yz, get_train_transform(),
                                     train_yz_kidneys_rle, train_volume, mode="yz")
+    train_dataset_2 = ImageDataset(train_images_2, train_masks_2, get_train_transform(), train_kidneys_rle_2,
+                                   train_volume_2, mode="xy")
+    train_dataset_2_xz = ImageDataset(train_images_2_xz, train_masks_2_xz, get_train_transform(),
+                                      train_xz_kidneys_rle_2, train_volume_2, mode="xz")
+    train_dataset_2_yz = ImageDataset(train_images_2_yz, train_masks_2_yz, get_train_transform(),
+                                      train_yz_kidneys_rle_2, train_volume_2, mode="yz")
     train_loader = DataLoader(train_dataset, batch_size=cfg['batch_size'], shuffle=True, num_workers=cfg['num_workers'],
                               pin_memory=True)
 
@@ -66,19 +80,26 @@ def main(cfg):
                                  num_workers=cfg['num_workers'], pin_memory=True)
     valid_loader = DataLoader(valid_dataset, batch_size=cfg['batch_size'], shuffle=False,
                               num_workers=cfg['num_workers'], pin_memory=True)
+    train_loader_2 = DataLoader(train_dataset_2, batch_size=cfg['batch_size'], shuffle=True,
+                                num_workers=cfg['num_workers'], pin_memory=True)
+    train_loader_2_xz = DataLoader(train_dataset_2_xz, batch_size=cfg['batch_size'], shuffle=True,
+                                   num_workers=cfg['num_workers'], pin_memory=True)
+    train_loader_2_yz = DataLoader(train_dataset_2_yz, batch_size=cfg['batch_size'], shuffle=True,
+                                   num_workers=cfg['num_workers'], pin_memory=True)
 
-    model = ReturnModelNextVit(cfg['model_name'], in_channels=cfg['in_channels'], classes=cfg['classes'],
+    model = ReturnModel(cfg['model_name'], in_channels=cfg['in_channels'], classes=cfg['classes'],
                         pad_factor=cfg['pad_factor'], )
     optimizer = torch.optim.AdamW(model.parameters(), lr=float(cfg['lr']))
     scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=int(
         (len(train_loader) + len(train_loader_yz) + len(train_loader_xz)) * 10),
                                                                      eta_min=float(cfg['min_lr']))
-    (train_loader, valid_loader, model, optimizer, scheduler, train_loader_yz, train_loader_xz,
+    (train_loader, valid_loader, model, optimizer, scheduler, train_loader_yz, train_loader_xz, train_loader_2,
+     train_loader_2_yz, train_loader_2_xz
      ) = accelerate.prepare(
         train_loader,
         valid_loader,
         model,
-        optimizer, scheduler, train_loader_yz, train_loader_xz,
+        optimizer, scheduler, train_loader_yz, train_loader_xz, train_loader_2, train_loader_2_yz, train_loader_2_xz
     )
 
     criterion = DiceLoss(mode="multilabel")
@@ -89,7 +110,7 @@ def main(cfg):
 
     for epoch in range(cfg['epochs']):
         train_fn(
-            data_loader_list=[train_loader, train_loader_xz, train_loader_yz, ],
+            data_loader_list=[train_loader, train_loader_xz, train_loader_yz, valid_loader],
             model=model,
             criterion=criterion,
             optimizer=optimizer,
@@ -122,9 +143,9 @@ def main(cfg):
             best_surface_dice = surface_dice
             accelerate.save(model_weights, f"{cfg['model_dir']}/model_best_surface_dice.pth")
             accelerate.print(f"Saved Model With Best Surface Dice Score {best_surface_dice}")
-        if epoch  == 3:
+        if epoch == 3:
             accelerate.save(model_weights, f"{cfg['model_dir']}/model_epoch_{epoch}.pth")
-        accelerate.save(model_weights, f"{cfg['model_dir']}/model_last_epoch.pth")
+        #accelerate.save(model_weights, f"{cfg['model_dir']}/model_last_epoch.pth")
     accelerate.end_training()
 
 
