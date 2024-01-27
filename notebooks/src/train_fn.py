@@ -68,9 +68,7 @@ def validation_fn(
         labels_df: pd.DataFrame,
         model_dir: str,
 ):
-    labels_df_new = labels_df.copy()
     # after the 900th keep all the rows
-    labels_df_new = labels_df_new[:900].reset_index(drop=True)
     gc.collect()
     torch.cuda.empty_cache()
     model.eval()
@@ -121,6 +119,10 @@ def validation_fn(
         pd_dataframe = pd.DataFrame(pd_dataframe)
         #     # drop all duplicates in the dataframe
         pd_dataframe = pd_dataframe.drop_duplicates(subset=['id'])
+        # drop the ids which are not present in pd_dataframe from labels_df_new
+        labels_df_new = labels_df.copy()
+
+        labels_df_new = labels_df_new[labels_df_new['id'].isin(pd_dataframe['id'])].reset_index(drop=True)
         surface_dice = compute_surface_dice_score(submit=pd_dataframe, label=labels_df_new)
         threshold_score_dict.update({f"threshold_{m / 10}": surface_dice})
     max_surface_dice = max(threshold_score_dict.values())
