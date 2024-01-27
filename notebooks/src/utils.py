@@ -1,4 +1,3 @@
-import gc
 
 from segmentation_models_pytorch.utils.metrics import Fscore
 from torch import nn
@@ -22,18 +21,18 @@ class Dice(nn.Module):
         super(Dice, self).__init__()
         self.metric = Fscore(threshold=threshold, activation='sigmoid')
 
-    def forward(self, inputs: torch.Tensor, targets: torch.Tensor, smooth: int = 1) -> torch.Tensor:
+    def forward(self, inputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
         dice = self.metric(inputs, targets)
 
         return dice
 
 
-class Dice_Valid(nn.Module):
+class dicevalid(nn.Module):
     def __init__(self, threshold=0.5):
-        super(Dice_Valid, self).__init__()
+        super(dicevalid, self).__init__()
         self.metric = Fscore(threshold=threshold, )
 
-    def forward(self, inputs: torch.Tensor, targets: torch.Tensor, smooth: int = 1) -> torch.Tensor:
+    def forward(self, inputs: torch.Tensor, targets: torch.Tensor,  ) -> torch.Tensor:
         dice = self.metric(inputs, targets)
 
         return dice
@@ -69,12 +68,12 @@ def rle_encode(mask: np.array):
 
 
 def apply_canny_threshold_in_chunk(x: np.array, low: float, high: float, chunk_size: int = 32):
-    D, H, W = x.shape
-    predict = np.zeros((D, H, W), np.uint8)
+    d, h, w = x.shape
+    predict = np.zeros((d, h, w), np.uint8)
     # Modify the iteration to step fully by chunk_size without overlapping
-    for i in range(0, D, chunk_size):
+    for i in range(0, d, chunk_size):
         # Determine the end index of the chunk, considering the end of the array
-        end_i = i + chunk_size if i + chunk_size < D else D
+        end_i = i + chunk_size if i + chunk_size < d else d
         # Extract the chunk of images to process with Canny
         chunk = x[i:end_i]
         # Apply Canny edge detection on each 2D slice in the chunk
@@ -113,6 +112,7 @@ def remove_small_objects(mask, min_size):
     return processed
 
 
+# noinspection PyUnresolvedReferences
 def choose_biggest_object(mask, threshold):
     mask = ((mask > threshold) * 255).astype(np.uint8)
     num_label, label, stats, centroid = cv2.connectedComponentsWithStats(mask, connectivity=8)
@@ -138,10 +138,10 @@ def apply_hysteresis_thresholding(volume: np.array, low: float, high: float, chu
     """
     # Apply hysteresis thresholding to each slice in the volume
 
-    D, H, W = volume.shape
-    predict = np.zeros((D, H, W), np.uint8)
+    d, H, W = volume.shape
+    predict = np.zeros((d, H, W), np.uint8)
 
-    for i in range(0, D, chunk_size // 2):
+    for i in range(0, d, chunk_size // 2):
         predict[i:i + chunk_size] = np.maximum(
             filters.apply_hysteresis_threshold(volume[i:i + chunk_size], low, high),
             predict[i:i + chunk_size]
@@ -200,7 +200,6 @@ def norm_by_percentile(volume, low=10, high=99.8, alpha=0.01):
 def load_images_and_masks(directory: str, image_subdir: str, label_subdir: str, kidney_rle: dict,
                           kidney_rle_prefix: str):
     image_dir = os.path.join(directory, image_subdir)
-    label_dir = os.path.join(directory, label_subdir)
     image_files = sorted(os.listdir(image_dir))
     if kidney_rle_prefix == 'kidney_2':
         image_files = image_files[900:]
@@ -215,3 +214,14 @@ def load_images_and_masks(directory: str, image_subdir: str, label_subdir: str, 
         volume = np.stack([cv2.imread(i, cv2.IMREAD_GRAYSCALE).astype(np.float16) for i in tqdm(images_full_path)])
 
         return images_full_path, labels_full_path, kidneys_rle, norm_by_percentile(volume)
+
+
+def load_images_and_masks_pseudo(directory: str, image_subdir: str):
+    image_dir = os.path.join(directory, image_subdir)
+    image_files = sorted(os.listdir(image_dir))
+
+    images_full_path = [os.path.join(image_dir, f) for f in image_files]
+    masks = np.load(f"{directory}/labels/volume.npy").astype(np.float16)
+    volume = np.stack([cv2.imread(i, cv2.IMREAD_GRAYSCALE).astype(np.float16) for i in tqdm(images_full_path)])
+
+    return images_full_path, norm_by_percentile(volume), masks

@@ -10,7 +10,7 @@ from dataset import CombinedDataLoader
 from augmentations import get_mosaic_2x2
 
 dice = Dice()
-dice_valid = Dice_Valid()
+dice_valid = dicevalid()
 
 tqdm_color = get_color_escape(0, 229, 255)  # Red color for example
 tqdm_style = {
@@ -95,7 +95,7 @@ def validation_fn(
                 f"Epoch:{epoch + 1}, valid_loss: {loss_metric:.5f}")
             outputs_not_multiply = outputs_not_multiply.detach().cpu().float().numpy()
             outputs = outputs[:, 0, :, :] * outputs[:, 1, :, :]
-            dice_batch = dice_valid(outputs, masks[:, 0, :, :])
+            dice_batch = dicevalid(outputs, masks[:, 0, :, :])
             dice_list.append(dice_batch.item())
 
             for p, image, in enumerate(outputs_not_multiply, ):

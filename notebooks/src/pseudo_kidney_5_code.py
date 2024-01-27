@@ -1,4 +1,6 @@
 import gc
+
+from numpy import ndarray, dtype, floating
 from torch.utils.checkpoint import checkpoint
 import re
 import albumentations
@@ -6,7 +8,7 @@ import numpy as np
 import os
 from torch.utils.data import Dataset, DataLoader
 import cv2
-from typing import Tuple
+from typing import Tuple, Any
 import torch
 from albumentations import *
 from albumentations.pytorch import ToTensorV2
@@ -70,7 +72,7 @@ def rle_encode(mask: np.array) -> str:
     return rle
 
 
-def get_valid_transform(image: np.array, original_height: int, original_width: int,pad_factor:int=224) -> np.array:
+def get_valid_transform(image: np.array) -> np.array:
     """
     Crops the padded image back to its original dimensions.
 
@@ -81,10 +83,7 @@ def get_valid_transform(image: np.array, original_height: int, original_width: i
     """
     # Define the cropping transformation
     # round up original height and width to nearest 32
-    original_height = int(np.ceil(original_height / pad_factor) * pad_factor)
-    original_width = int(np.ceil(original_width / pad_factor) * pad_factor)
     transform = Compose([
-        PadIfNeeded(min_height=original_height, min_width=original_width),
         ToTensorV2(),
     ])
 
@@ -144,30 +143,44 @@ class ImageDataset(Dataset):
         image_shape = tuple(str(element) for element in image_shape)
 
         image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
-        image = self.transform(image=image, original_height=int(image_shape[0]), original_width=int(image_shape[1]))
+        image = self.transform(image=image)
         return image, image_shape, image_id
 
 
 class ReturnModel(nn.Module):
-    def __init__(self, model_name: str, in_channels: int, classes: int, ):
+    def __init__(self, model_name: str, in_channels: int, classes: int, pad_factor: int):
         super(ReturnModel, self).__init__()
         # Initialize the Unet model
         self.unet = smp.Unet(
             encoder_name=model_name,
-            encoder_weights=None,
+            encoder_weights="imagenet",
             in_channels=in_channels,
             classes=classes,
         )
-        # if not inference:
-        #    self.unet.encoder.model.set_grad_checkpointing(True)
+        self.pad_factor = pad_factor
 
-    def forward(self, x, ):
-        # Pad the input
-        x = checkpoint(self.unet.encoder, x, )
+    def forward(self, x):
+        original_size = x.shape[2:]
+        x, pad = self._pad_image(x, pad_factor=self.pad_factor)
+        x = checkpoint(self.unet.encoder, x, use_reentrant=True)
         x = self.unet.decoder(*x)
         x = self.unet.segmentation_head(x)
-
+        x = self._unpad(x, original_size, pad)
         return x
+
+    def _pad_image(self, x: torch.Tensor, pad_factor: int = 224):
+        h, w = x.shape[2], x.shape[3]
+        h_pad = (pad_factor - h % pad_factor) % pad_factor
+        w_pad = (pad_factor - w % pad_factor) % pad_factor
+
+        # Calculate padding
+        pad = [w_pad // 2, w_pad - w_pad // 2, h_pad // 2, h_pad - h_pad // 2]
+        x = nn.functional.pad(x, pad, mode='constant', value=0)
+        return x, pad
+
+    def _unpad(self, x, original_size, pad):
+        h, w = original_size
+        return x[:, :, pad[2]:h + pad[2], pad[0]:w + pad[0]]
 
 
 def reverse_padding(image: np.array, original_height: int, original_width: int):
@@ -220,116 +233,72 @@ def inference_loop(model: nn.Module, images: torch.Tensor) -> torch.Tensor:
 
 def inference_fn(model: nn.Module, data_loader: DataLoader, data_loader_xz: DataLoader, data_loader_yz: DataLoader,
                  device: torch.device,
-                 volume_shape: Tuple) -> Tuple[list, list]:
+                 volume_shape: Tuple) -> ndarray[Any, dtype[floating[Any]]]:
     torch.cuda.empty_cache()
     model.eval()
-    rles_list = []
-    image_ids_all = []
-    volume = np.zeros(volume_shape,dtype=np.float16)
+    volume = torch.zeros((2, *volume_shape), dtype=torch.float16)
     global_counter = 0
     for i, (images, image_shapes, image_ids) in tqdm(enumerate(data_loader), total=len(data_loader)):
         images = images.to(device, non_blocking=True).float()
-        print(images.shape)
         outputs = inference_loop(model, images)
-
-        for j, image in enumerate(outputs):
-            kidney = image[1, :, :]
-            kidney = choose_biggest_object(kidney.numpy(), 0.5)
-            output_mask = image[0, :, :]
-            output_mask = output_mask.numpy() * kidney
-
-            output_mask = reverse_padding(output_mask,
-                                          original_height=int(image_shapes[0][j]),
-                                          original_width=int(image_shapes[1][j]))
-            image_ids_all.append(image_ids[j])
-            volume[global_counter] += output_mask
+        #outputs = outputs.numpy()
+        for image in outputs[:]:
+            volume[:, global_counter] += image
             global_counter += 1
-            del image, output_mask, kidney
-        del outputs, images
-        gc.collect()
+
     global_counter = 0
     for i, (images, image_shapes, image_ids) in tqdm(enumerate(data_loader_xz), total=len(data_loader_xz)):
         images = images.to(device, non_blocking=True).float()
         outputs = inference_loop(model, images)
-
-        for j, image in enumerate(outputs):
-            kidney = image[1, :, :]
-            kidney = choose_biggest_object(kidney.numpy(), 0.5)
-            output_mask = image[0, :, :]
-            output_mask = (output_mask.numpy() * kidney)
-            output_mask = reverse_padding(output_mask,
-                                          original_height=int(image_shapes[0][j]),
-                                          original_width=int(image_shapes[1][j]))
-
-            volume[:, global_counter] += output_mask
+        #outputs = outputs.numpy()
+        for image in outputs[:]:
+            volume[:, :, global_counter] += image
             global_counter += 1
-            del image, output_mask, kidney
-        del outputs, images
 
     gc.collect()
     global_counter = 0
     for i, (images, image_shapes, image_ids) in tqdm(enumerate(data_loader_yz), total=len(data_loader_yz)):
         images = images.to(device, non_blocking=True).float()
         outputs = inference_loop(model, images)
-        for j, image in enumerate(outputs):
-            kidney = image[1, :, :]
-            kidney = choose_biggest_object(kidney.numpy(), 0.5)
-            output_mask = image[0, :, :] * kidney
-            output_mask = (output_mask.numpy() * kidney)
-            output_mask = reverse_padding(output_mask,
-                                          original_height=int(image_shapes[0][j]),
-                                          original_width=int(image_shapes[1][j]))
-
-            volume[:, :, global_counter] += output_mask
+        #outputs = outputs.numpy()
+        for image in outputs[:]:
+            volume[:, :, :, global_counter] += image
             global_counter += 1
-            del output_mask, image, kidney
-        del outputs, images
-
     gc.collect()
     volume = volume / 3
-    volume = apply_hysteresis_thresholding(volume, 0.2, 0.6)
 
-    #volume = volume > 0.2
-    #volume = (volume * 255).astype(np.uint8)
-    for output_mask in volume:
-        #output_mask = output_mask > 0.2
-        output_mask = (output_mask * 255).astype(np.uint8)
-        rles_list.append(rle_encode(output_mask))
-    del volume
-    gc.collect()
-    return rles_list, image_ids_all
+    return volume.numpy()
+
 
 def extract_number(filename):
     match = re.search(r'(\d+)', filename)
     return int(match.group()) if match else None
+
+
 def norm_by_percentile(volume, low=10, high=99.8, alpha=0.01):
-    xmin = np.percentile(volume,low)
-    xmax = np.percentile(volume,high)
-    x = (volume-xmin)/(xmax-xmin)
+    xmin = np.percentile(volume, low)
+    xmax = np.percentile(volume, high)
+    x = (volume - xmin) / (xmax - xmin)
     if 1:
-        x[x>1]=(x[x>1]-1)*alpha +1
-        x[x<0]=(x[x<0])*alpha
-    #x = np.clip(x,0,1)
+        x[x > 1] = (x[x > 1] - 1) * alpha + 1
+        x[x < 0] = (x[x < 0]) * alpha
+    # x = np.clip(x,0,1)
     return x
+
 
 def main(cfg: dict):
     seed_everything(cfg['seed'])
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    test_dirs = sorted(glob.glob(f"{cfg['test_dir']}/*"))
-    model = ReturnModel(cfg['model_name'], cfg['in_channels'], cfg['classes'])
+    test_dirs = ['/home/mithil/PycharmProjects/SenNetKideny/data/train/kidney_5']
+    model = ReturnModel(cfg['model_name'], cfg['in_channels'], cfg['classes'], 224)
     model.to(device)
     model.load_state_dict(torch.load(cfg["model_path"], map_location=torch.device('cuda')), strict=True)
     #model = nn.DataParallel(model)
 
-    global_rle_list = []
-    global_image_ids = []
-
     for test_dir in test_dirs:
         test_files = sorted(glob.glob(f"{test_dir}/images/*.tif"))
-        print(test_files)
         volume = np.stack([cv2.imread(i, cv2.IMREAD_GRAYSCALE) for i in test_files])
         volume = norm_by_percentile(volume).astype(np.float32)
-        print(volume.shape)
         test_dataset_xy = ImageDataset(test_files, get_valid_transform, mode='xy', volume=volume)
         test_dataset_xz = ImageDataset(test_files, get_valid_transform, mode='xz',
                                        volume=volume)
@@ -341,17 +310,13 @@ def main(cfg: dict):
                                     num_workers=cfg['num_workers'], pin_memory=True)
         test_loader_yz = DataLoader(test_dataset_yz, batch_size=cfg['batch_size'], shuffle=False,
                                     num_workers=cfg['num_workers'], pin_memory=True)
-        rles_list, image_ids = inference_fn(model=model, data_loader=test_loader, data_loader_xz=test_loader_xz,
-                                            data_loader_yz=test_loader_yz,
-                                            device=device, volume_shape=volume.shape[:3])
-        global_rle_list.extend(rles_list)
-        global_image_ids.extend(image_ids)
+        volume_labels = inference_fn(model=model, data_loader=test_loader, data_loader_xz=test_loader_xz,
+                                     data_loader_yz=test_loader_yz,
+                                     device=device, volume_shape=volume.shape[:3])
+        # create labels dir in test dir
+        os.makedirs(f"{test_dir}/labels", exist_ok=True)
+        np.save(f"{test_dir}/labels/volume.npy", volume_labels)
         del volume, test_dataset_xy, test_dataset_xz, test_dataset_yz, test_loader, test_loader_xz, test_loader_yz
-    submission = pd.DataFrame()
-    submission['id'] = global_image_ids
-    submission['rle'] = global_rle_list
-    submission.to_csv('submission.csv', index=False)
-    print(submission.head())
 
 
 config = {
@@ -359,9 +324,9 @@ config = {
     "model_name": "tu-timm/maxvit_base_tf_224.in1k",
     "in_channels": 3,
     "classes": 2,
-    "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/maxvit_base_tf_224_volume_normalize_dice_kidney_3_dense/model_epoch_3.pth" ,
+    "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/maxvit_base_tf_224_volume_normalize_dice_kidney_3_dense/model_epoch_3.pth",
     "batch_size": 4,
-    "num_workers": 4,
+    "num_workers": 8,
     "threshold": 0.15,
 }
 if __name__ == "__main__":
