@@ -73,7 +73,7 @@ class ImageDatasetPseudo(Dataset):
             case "yz":
                 return self.volume.shape[2]
 
-    def __getitem__(self, item) -> Tuple[torch.Tensor, torch.Tensor, str]:
+    def __getitem__(self, item) -> Tuple[torch.Tensor, torch.Tensor, strwh]:
         match self.mode:
             case "xy":
                 image = self.volume[item].astype(np.float32)

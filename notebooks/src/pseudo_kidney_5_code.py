@@ -324,7 +324,7 @@ config = {
     "model_name": "tu-timm/maxvit_base_tf_224.in1k",
     "in_channels": 3,
     "classes": 2,
-    "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/maxvit_base_tf_224_volume_normalize_dice_kidney_3_dense/model_epoch_3.pth",
+    "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/maxvit_base_tf_224_kidney_3_sparse_replace_labels/model_best_surface_dice.pth",
     "batch_size": 4,
     "num_workers": 8,
     "threshold": 0.15,

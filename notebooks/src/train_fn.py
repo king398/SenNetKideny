@@ -7,8 +7,7 @@ from accelerate import Accelerator
 import pandas as pd
 from metric import compute_surface_dice_score
 from dataset import CombinedDataLoader
-from augmentations import get_mosaic_2x2
-
+import gc
 dice = Dice()
 dice_valid = dicevalid()
 
@@ -41,8 +40,6 @@ def train_fn(
         with accelerator.accumulate(model):
             masks = masks.float().contiguous()
             images = images.float().contiguous()
-            # images = get_mosaic_2x2(images)
-            # masks = get_mosaic_2x2(masks)
             output = model(images)
             loss = criterion(output, masks)
             accelerator.backward(loss)
@@ -95,7 +92,7 @@ def validation_fn(
                 f"Epoch:{epoch + 1}, valid_loss: {loss_metric:.5f}")
             outputs_not_multiply = outputs_not_multiply.detach().cpu().float().numpy()
             outputs = outputs[:, 0, :, :] * outputs[:, 1, :, :]
-            dice_batch = dicevalid(outputs, masks[:, 0, :, :])
+            dice_batch = dice_valid(outputs, masks[:, 0, :, :])
             dice_list.append(dice_batch.item())
 
             for p, image, in enumerate(outputs_not_multiply, ):
