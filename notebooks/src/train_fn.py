@@ -8,6 +8,7 @@ import pandas as pd
 from metric import compute_surface_dice_score
 from dataset import CombinedDataLoader
 import gc
+
 dice = Dice()
 dice_valid = dicevalid()
 
@@ -87,18 +88,13 @@ def validation_fn(
             image_ids = accelerator.gather_for_metrics(image_ids)
             loss_metric += loss.item() / (i + 1)
             outputs = outputs.sigmoid()
-            outputs_not_multiply = outputs.detach().clone()
             stream.set_description(
                 f"Epoch:{epoch + 1}, valid_loss: {loss_metric:.5f}")
-            outputs_not_multiply = outputs_not_multiply.detach().cpu().float().numpy()
-            outputs = outputs[:, 0, :, :] * outputs[:, 1, :, :]
-            dice_batch = dice_valid(outputs, masks[:, 0, :, :])
+            dice_batch = dice_valid(outputs, masks)
             dice_list.append(dice_batch.item())
 
-            for p, image, in enumerate(outputs_not_multiply, ):
-                kidney = image[1, :, :]
-                kidney = choose_biggest_object(kidney, 0.5)
-                output_mask = image[0, :, :] * kidney
+            for p, image, in enumerate(outputs, ):
+                output_mask = image.detach().cpu().numpy()
                 # iterate from threshold 0.1 to 0.5
                 threshold = [0.1, 0.2, 0.3, 0.4, 0.5]
 

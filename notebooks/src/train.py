@@ -3,9 +3,9 @@ import warnings
 import yaml
 import pandas as pd
 from accelerate import Accelerator, DistributedDataParallelKwargs
-from utils import seed_everything, write_yaml, load_images_and_masks, load_images_and_masks_pseudo
+from utils import seed_everything, write_yaml, load_images_and_masks
 import gc
-from dataset import ImageDataset, ImageDatasetPseudo
+from dataset import ImageDataset
 from pathlib import Path
 from augmentations import get_train_transform, get_valid_transform
 from torch.utils.data import DataLoader
@@ -32,20 +32,14 @@ def main(cfg):
     train_images, train_masks, train_kidneys_rle, train_volume = load_images_and_masks(
         cfg['train_dir'], 'images', 'labels', kidney_rle, 'kidney_1_dense'
     )
-
-    # Load validation images and masks
     validation_images, validation_masks, validation_kidneys_rle, validation_volume = load_images_and_masks(
         cfg['validation_dir'], 'images', 'labels', kidney_rle, 'kidney_2'
     )
 
-    # Load train images and masks for train_dir_2
-
-    # Load train images and masks for train_dir_xz
     train_images_xz, train_masks_xz, train_xz_kidneys_rle = load_images_and_masks(
         cfg['train_dir'] + '_xz', 'images', 'labels', kidney_rle, 'kidney_1_dense_xz'
     )
 
-    # Load train images and masks for train_dir_yz
     train_images_yz, train_masks_yz, train_yz_kidneys_rle = load_images_and_masks(
         cfg['train_dir'] + '_yz', 'images', 'labels', kidney_rle, 'kidney_1_dense_yz'
     )
@@ -56,8 +50,6 @@ def main(cfg):
         cfg['train_dir_2'] + '_xz', 'images', 'labels', kidney_rle, 'kidney_3_sparse_xz')
     train_images_2_yz, train_masks_2_yz, train_yz_kidneys_rle_2 = load_images_and_masks(
         cfg['train_dir_2'] + '_yz', 'images', 'labels', kidney_rle, 'kidney_3_sparse_yz')
-    train_images_pseudo, train_pseudo_volume, train_pseudo_masks = load_images_and_masks_pseudo(cfg['pseudo_dir'],
-                                                                                                'images', )
 
     train_dataset = ImageDataset(train_images, train_masks, get_train_transform(), train_kidneys_rle, train_volume,
                                  mode="xy")
@@ -73,12 +65,6 @@ def main(cfg):
                                       train_xz_kidneys_rle_2, train_volume_2, mode="xz")
     train_dataset_2_yz = ImageDataset(train_images_2_yz, train_masks_2_yz, get_train_transform(),
                                       train_yz_kidneys_rle_2, train_volume_2, mode="yz")
-    train_dataset_pseudo = ImageDatasetPseudo(train_images_pseudo, get_train_transform(), train_pseudo_masks,
-                                              train_pseudo_volume, mode="xy")
-    train_dataset_pseudo_xz = ImageDatasetPseudo(train_images_pseudo, get_train_transform(), train_pseudo_masks,
-                                                 train_pseudo_volume, mode="xz")
-    train_dataset_pseudo_yz = ImageDatasetPseudo(train_images_pseudo, get_train_transform(), train_pseudo_masks,
-                                                 train_pseudo_volume, mode="yz")
     train_loader = DataLoader(train_dataset, batch_size=cfg['batch_size'], shuffle=True, num_workers=cfg['num_workers'],
                               pin_memory=True)
 
@@ -94,39 +80,33 @@ def main(cfg):
                                    num_workers=cfg['num_workers'], pin_memory=True)
     train_loader_2_yz = DataLoader(train_dataset_2_yz, batch_size=cfg['batch_size'], shuffle=True,
                                    num_workers=cfg['num_workers'], pin_memory=True)
-    train_loader_pseudo = DataLoader(train_dataset_pseudo, batch_size=cfg['batch_size'], shuffle=True,
-                                     num_workers=cfg['num_workers'], pin_memory=True)
-    train_loader_pseudo_xz = DataLoader(train_dataset_pseudo_xz, batch_size=cfg['batch_size'], shuffle=True,
-                                        num_workers=cfg['num_workers'], pin_memory=True)
-    train_loader_pseudo_yz = DataLoader(train_dataset_pseudo_yz, batch_size=cfg['batch_size'], shuffle=True,
-                                        num_workers=cfg['num_workers'], pin_memory=True)
 
     model = ReturnModel(cfg['model_name'], in_channels=cfg['in_channels'], classes=cfg['classes'],
                         pad_factor=cfg['pad_factor'], )
     optimizer = torch.optim.AdamW(model.parameters(), lr=float(cfg['lr']))
+
     scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=int(
-        (len(train_loader) + len(train_loader_yz) + len(train_loader_xz)) * 10),
+        (len(train_loader) + len(train_loader_yz) + len(train_loader_xz) + len(train_loader_2) + len(
+            train_loader_2_xz) + len(train_loader_2_yz)) * 10),
                                                                      eta_min=float(cfg['min_lr']))
     (train_loader, valid_loader, model, optimizer, scheduler, train_loader_yz, train_loader_xz, train_loader_2,
-     train_loader_2_yz, train_loader_2_xz, train_loader_pseudo, train_loader_pseudo_yz, train_loader_pseudo_xz
+     train_loader_2_yz, train_loader_2_xz
      ) = accelerate.prepare(
         train_loader,
         valid_loader,
         model,
-        optimizer, scheduler, train_loader_yz, train_loader_xz, train_loader_2, train_loader_2_yz, train_loader_2_xz,
-        train_loader_pseudo, train_loader_pseudo_yz, train_loader_pseudo_xz
+        optimizer, scheduler, train_loader_yz, train_loader_xz, train_loader_2, train_loader_2_yz, train_loader_2_xz
     )
 
-    criterion = DiceLoss(mode="multilabel")
+    criterion = DiceLoss(mode="binary")
     best_dice = -1
     best_surface_dice = -1
-    # remove all the rows which do not contain kidney_3_dense in the id column
     labels_df = pd.read_csv(cfg['labels_df'])
 
     for epoch in range(cfg['epochs']):
         train_fn(
-            data_loader_list=[train_loader, train_loader_xz, train_loader_yz, train_loader_2, train_loader_2_xz,
-                              train_loader_2_yz, train_loader_pseudo, train_loader_pseudo_xz, train_loader_pseudo_yz],
+            data_loader_list=[train_loader, train_loader_xz, train_loader_yz, train_loader_2, train_loader_2_yz,
+                              train_loader_2_xz],
             model=model,
             criterion=criterion,
             optimizer=optimizer,

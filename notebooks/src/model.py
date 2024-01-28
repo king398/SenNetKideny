@@ -6,9 +6,6 @@ from nextvit import *
 from segmentation_models_pytorch.base.heads import SegmentationHead
 from torch import nn
 import torch
-from torch.nn import functional as F
-
-from torchvision import transforms as T
 
 def return_model(model_name: str, in_channels: int, classes: int):
     model = smp.Unet(
@@ -24,7 +21,6 @@ def return_model(model_name: str, in_channels: int, classes: int):
 class ReturnModel(nn.Module):
     def __init__(self, model_name: str, in_channels: int, classes: int, pad_factor: int):
         super(ReturnModel, self).__init__()
-        # Initialize the Unet model
         self.unet = smp.Unet(
             encoder_name=model_name,
             encoder_weights="imagenet",
@@ -33,7 +29,7 @@ class ReturnModel(nn.Module):
         )
         self.pad_factor = pad_factor
 
-    def forward(self, x, inference: bool = False):
+    def forward(self, x):
         original_size = x.shape[2:]
         x, pad = self._pad_image(x, pad_factor=self.pad_factor)
         x = checkpoint(self.unet.encoder, x, use_reentrant=True)
@@ -56,8 +52,6 @@ class ReturnModel(nn.Module):
     def _unpad(self, x, original_size, pad):
         h, w = original_size
         return x[:, :, pad[2]:h + pad[2], pad[0]:w + pad[0]]
-    def central_crop(size):
-        return T.CenterCrop(size)
 
 
 
