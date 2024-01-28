@@ -204,4 +204,4 @@ def load_images_and_masks(cfg, kidney_name: str):
         else:
             volume = np.load(cfg['cub3_path_percentile']).squeeze(3).transpose(2, 0, 1)
         # volume = np.stack([read_cv2(fp) for fp in tqdm(images_paths, total=len(images_paths), desc=desc)])
-        return images_paths, masks_paths, kid_masks_paths, np.log1p(volume)
+        return images_paths, masks_paths, kid_masks_paths, volume

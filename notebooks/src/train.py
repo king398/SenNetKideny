@@ -46,13 +46,19 @@ def main(cfg):
     # Load train images and masks for train_dir_yz
     fit_images_yz, fit_masks_yz, fit_yz_kidneys_rle = load_images_and_masks(cfg, kidney_name='kidney_1_dense_yz')
 
+    fit_images_3_sparce, fit_masks_3_sparce, fit_kidneys_rle = load_images_and_masks(cfg, kidney_name='kidney_3_sparce')
+    fit_images_3_sparce_xz, fit_masks_3_sparce_xz, fit_xz_kidneys_rle = load_images_and_masks(cfg, kidney_name='kidney_3_sparce_xz')
+    fit_images_3_sparce_yz, fit_masks_3_sparce_yz, fit_yz_kidneys_rle = load_images_and_masks(cfg, kidney_name='kidney_3_sparce_yz')
+
+    fit_dataset_3 = ImageDataset(fit_images_3_sparce, fit_masks_3_sparce, get_fit_transform(), fit_kidneys_rle, fit_volume, mode="xy")
+    fit_dataset_3_xz = ImageDataset(fit_images_3_sparce_xz, fit_masks_3_sparce_xz, get_fit_transform(), fit_xz_kidneys_rle, fit_volume, mode="xz")
+    fit_dataset_3_yz = ImageDataset(fit_images_3_sparce_yz, fit_masks_3_sparce_yz, get_fit_transform(), fit_yz_kidneys_rle, fit_volume, mode="yz")
+
     # Load train images and masks for train_dir_2_xz
     fit_dataset = ImageDataset(fit_images, fit_masks, get_fit_transform(), fit_kidneys_rle, fit_volume, mode="xy")
     val_dataset = ImageDataset(val_images, val_masks, get_val_transform(), val_kidneys_rle, val_volume, mode="xy")
-    fit_dataset_xz = ImageDataset(fit_images_xz, fit_masks_xz, get_fit_transform(),
-                                  fit_xz_kidneys_rle, fit_volume, mode="xz")
-    fit_dataset_yz = ImageDataset(fit_images_yz, fit_masks_yz, get_fit_transform(),
-                                  fit_yz_kidneys_rle, fit_volume, mode="yz")
+    fit_dataset_xz = ImageDataset(fit_images_xz, fit_masks_xz, get_fit_transform(), fit_xz_kidneys_rle, fit_volume, mode="xz")
+    fit_dataset_yz = ImageDataset(fit_images_yz, fit_masks_yz, get_fit_transform(), fit_yz_kidneys_rle, fit_volume, mode="yz")
 
     fit_loader_kwargs = {'batch_size': cfg['batch_size'], 'shuffle': True,
                          'num_workers': cfg['num_workers'], 'pin_memory': True}
@@ -61,6 +67,10 @@ def main(cfg):
     fit_loader_xz = DataLoader(fit_dataset_xz, **fit_loader_kwargs)
     fit_loader_yz = DataLoader(fit_dataset_yz, **fit_loader_kwargs)
 
+    fit_loader_3 = DataLoader(fit_dataset_3, **fit_loader_kwargs)
+    fit_loader_3_xz = DataLoader(fit_dataset_3_xz, **fit_loader_kwargs)
+    fit_loader_3_yz = DataLoader(fit_dataset_3_yz, **fit_loader_kwargs)
+
     fit_loader_kwargs['shuffle'] = False
     val_loader = DataLoader(val_dataset, **fit_loader_kwargs)
 
@@ -68,13 +78,17 @@ def main(cfg):
                         pad_factor=cfg['pad_factor'])
     optimizer = torch.optim.AdamW(model.parameters(), lr=(float(cfg['lr'])))
 
-    # T_max = int((len(fit_loader) + len(fit_loader_yz) + len(fit_loader_xz)) * 10)
-    T_max = ceil(len(fit_images + fit_images_xz + fit_images_yz) /
-                 (cfg['num_devices'] * cfg['batch_size'])) * cfg['epochs']
+    T_max = int((len(fit_loader) + len(fit_loader_yz) + len(fit_loader_xz)
+                 + len(fit_loader_3) + len(fit_loader_3_yz) + len(fit_loader_3_xz)
+                 ) * 10)
+    # T_max = ceil(len(fit_images + fit_images_xz + fit_images_yz) /
+    #              (cfg['num_devices'] * cfg['batch_size'])) * cfg['epochs']
     scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=T_max, eta_min=float(cfg['min_lr']))
     (fit_loader, val_loader, model, optimizer, scheduler, fit_loader_yz, fit_loader_xz,
+     fit_loader_3, fit_loader_3_yz, fit_loader_3_xz
      ) = accelerate.prepare(
         fit_loader, val_loader, model, optimizer, scheduler, fit_loader_yz, fit_loader_xz,
+        fit_loader_3, fit_loader_3_yz, fit_loader_3_xz
     )
 
     best_dice = -1
@@ -82,11 +96,12 @@ def main(cfg):
     criterion = DiceLoss(mode="multilabel")
     # remove all the rows which do not contain kidney_3_dense in the id column
     labels_df = pd.read_csv(cfg['labels_df'])
-    ema = ExponentialMovingAverage(model.parameters(), decay=0.995)
+    # ema = ExponentialMovingAverage(model.parameters(), decay=0.995)
 
     for epoch in range(cfg['epochs']):
         train_fn(
-            data_loader_list=[fit_loader, fit_loader_xz, fit_loader_yz],
+            data_loader_list=[fit_loader, fit_loader_xz, fit_loader_yz,
+                              fit_loader_3, fit_loader_3_xz, fit_loader_3_yz],
             model=model,
             criterion=criterion,
             optimizer=optimizer,
@@ -94,7 +109,7 @@ def main(cfg):
             epoch=epoch,
             fold=0,
             accelerator=accelerate,
-            ema=ema
+            # ema=ema
         )
 
         dice_score, surface_dice = validation_fn(
@@ -105,7 +120,7 @@ def main(cfg):
             accelerator=accelerate,
             labels_df=labels_df,
             model_dir=cfg['model_dir'],
-            ema=ema,
+            # ema=ema,
         )
         accelerate.wait_for_everyone()
         unwrapped_model = accelerate.unwrap_model(model)

@@ -1,13 +1,13 @@
-batch_size: 8
+batch_size: 4
 classes: 2
 epochs: 15
 gradient_accumulation_steps: 1
 in_channels: 3
 kidneys_df: /home/lasupreme/Desktop/python/personal/KAGGLE-VS/SenNetKideny/data/train_rles_kidneys.csv
 labels_df: /home/lasupreme/Desktop/python/personal/KAGGLE-VS/SenNetKideny/data/kidney_3_dense_full_self_encode.csv
-lr: 8e-04
-min_lr: 6e-05
-model_dir: /home/lasupreme/Desktop/python/personal/KAGGLE-VS/SenNetKideny/models/EXP15
+lr: 5e-04
+min_lr: 3e-05
+model_dir: /home/lasupreme/Desktop/python/personal/KAGGLE-VS/SenNetKideny/models/EXP19
 model_name: tu-timm/maxvit_base_tf_224.in1k
 num_workers: 4
 pad_factor: 224
