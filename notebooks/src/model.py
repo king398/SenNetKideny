@@ -137,8 +137,6 @@ class ReturnModelMaxViTDecoder(nn.Module):
     def __init__(self, model_name: str, in_channels: int, classes: int, pad_factor: int):
         super(ReturnModelMaxViTDecoder, self).__init__()
         # Initialize the Unet model
-        if not model_name.startswith("nextvit"):
-            raise ValueError("This Class is only for NextVit models")
         self.decoder_channels = (256, 128, 64, 32, 16)
         self.encoder = timm.create_model(model_name)
         self.decoder = MaxViTDecoder(
