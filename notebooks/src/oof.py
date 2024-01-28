@@ -36,22 +36,22 @@ def inference_loop(model: nn.Module, images: torch.Tensor) -> torch.Tensor:
     outputs = None
     counter = 0
     with torch.no_grad() and autocast():
-        outputs_batch = model(images, inference=False).sigmoid().detach().cpu().float()
+        outputs_batch = model(images, ).sigmoid().detach().cpu().float()
         outputs = outputs_batch
         counter += 1
-        outputs_batch = model(torch.flip(images, dims=[2, ]), inference=False).sigmoid().detach().cpu().float()
+        outputs_batch = model(torch.flip(images, dims=[2, ]), ).sigmoid().detach().cpu().float()
         outputs += torch.flip(outputs_batch, dims=[2, ])
         counter += 1
-        outputs_batch = model(torch.flip(images, dims=[3, ]), inference=False).sigmoid().detach().cpu().float()
+        outputs_batch = model(torch.flip(images, dims=[3, ]), ).sigmoid().detach().cpu().float()
         outputs += torch.flip(outputs_batch, dims=[3, ])
         counter += 1
-        outputs_batch = model(torch.rot90(images, k=1, dims=[2, 3]), inference=False).sigmoid().detach().cpu().float()
+        outputs_batch = model(torch.rot90(images, k=1, dims=[2, 3]), ).sigmoid().detach().cpu().float()
         outputs += torch.rot90(outputs_batch, k=-1, dims=[2, 3])
         counter += 1
-        outputs_batch = model(torch.rot90(images, k=2, dims=[2, 3]), inference=False).sigmoid().detach().cpu().float()
+        outputs_batch = model(torch.rot90(images, k=2, dims=[2, 3]), ).sigmoid().detach().cpu().float()
         outputs += torch.rot90(outputs_batch, k=-2, dims=[2, 3])
         counter += 1
-        outputs_batch = model(torch.rot90(images, k=3, dims=[2, 3]), inference=False).sigmoid().detach().cpu().float()
+        outputs_batch = model(torch.rot90(images, k=3, dims=[2, 3]), ).sigmoid().detach().cpu().float()
         outputs += torch.rot90(outputs_batch, k=-3, dims=[2, 3])
         counter += 1
 
@@ -67,60 +67,50 @@ def inference_fn(model: nn.Module, data_loader: DataLoader, data_loader_xz: Data
     model.eval()
     rles_list = []
     image_ids_all = []
-    volume = np.zeros(volume_shape, dtype=np.float16)
+    volume = torch.zeros(volume_shape, dtype=torch.float16)
     global_counter = 0
     for i, (images, image_shapes, image_ids) in tqdm(enumerate(data_loader), total=len(data_loader)):
         images = images.to(device, non_blocking=True).float()
-
-        outputs = inference_loop(model, images)
+        outputs: torch.Tensor = inference_loop(model, images)
 
         for j, image in enumerate(outputs):
-            kidney = image[1, :, :]
-            kidney = choose_biggest_object(kidney.numpy(), 0.5)
             output_mask = image[0, :, :]
-            output_mask = output_mask.numpy() * kidney
+
             image_ids_all.append(image_ids[j])
             volume[global_counter] += output_mask
             global_counter += 1
-            del image, output_mask, kidney
+            del image, output_mask
         del outputs, images
         gc.collect()
     global_counter = 0
     for i, (images, image_shapes, image_ids) in tqdm(enumerate(data_loader_xz), total=len(data_loader_xz)):
-
         images = images.to(device, non_blocking=True).float()
         outputs = inference_loop(model, images)
 
         for j, image in enumerate(outputs):
-            kidney = image[1, :, :]
-            kidney = choose_biggest_object(kidney.numpy(), 0.5)
             output_mask = image[0, :, :]
-            output_mask = (output_mask.numpy() * kidney)
 
             volume[:, global_counter] += output_mask
             global_counter += 1
-            del image, output_mask, kidney
+            del image, output_mask
         del outputs, images
 
     gc.collect()
     global_counter = 0
     for i, (images, image_shapes, image_ids) in tqdm(enumerate(data_loader_yz), total=len(data_loader_yz)):
-
         images = images.to(device, non_blocking=True).float()
         outputs = inference_loop(model, images)
         for j, image in enumerate(outputs):
-            kidney = image[1, :, :]
-            kidney = choose_biggest_object(kidney.numpy(), 0.5)
-            output_mask = image[0, :, :] * kidney
-            output_mask = (output_mask.numpy() * kidney)
+            output_mask = image[0, :, :]
 
             volume[:, :, global_counter] += output_mask
             global_counter += 1
-            del output_mask, image, kidney
+            del image, output_mask
         del outputs, images
 
     gc.collect()
     volume = volume / 3
+    volume = volume.numpy()
     volume_no_threshold = volume.copy()
     volume = apply_hysteresis_thresholding(volume, 0.2, 0.6)
     # volume = volume > 0.3
@@ -136,7 +126,7 @@ def main(cfg: dict):
     global volume_uncompressed
     seed_everything(cfg['seed'])
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    test_dirs = ["/home/mithil/PycharmProjects/SenNetKideny/data/train/kidney_3_sparse", ]
+    test_dirs = ["/home/mithil/PycharmProjects/SenNetKideny/data/train/kidney_2", ]
     model = ReturnModel(cfg['model_name'], cfg['in_channels'], cfg['classes'], cfg['pad_factor'])
     model.to(device)
     model.load_state_dict(torch.load(cfg["model_path"], map_location=torch.device('cuda')))
@@ -182,14 +172,14 @@ def main(cfg: dict):
 
 config = {
     "seed": 42,
-    "model_name": "tu-timm/dm_nfnet_f2.dm_in1k",
+    "model_name": "tu-timm/maxvit_base_tf_224.in1k",
     "in_channels": 3,
-    "classes": 2,
+    "classes": 1,
     # "test_dir": '/kaggle/input/blood-vessel-segmentation/test',
-    "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/dm_nfnet_f2_volume_normalize_dice_find_best_epoch/model_best_surface_dice.pth",
+    "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/maxvit_base_tf_224_fixed_lr_scheduler_no_kidney/model_best_surface_dice.pth",
     "batch_size": 2,
     "num_workers": 8,
-    "pad_factor": 32,
+    "pad_factor": 224,
 }
 if __name__ == "__main__":
     main(config)

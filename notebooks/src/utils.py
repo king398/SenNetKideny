@@ -213,7 +213,7 @@ def load_images_and_masks(directory: str, image_subdir: str, label_subdir: str, 
     else:
         volume = np.stack([cv2.imread(i, cv2.IMREAD_GRAYSCALE).astype(np.float16) for i in tqdm(images_full_path)])
 
-        return images_full_path, labels_full_path, kidneys_rle, norm_by_percentile(volume)
+        return images_full_path, labels_full_path, kidneys_rle, volume
 
 
 def load_images_and_masks_pseudo(directory: str, image_subdir: str):

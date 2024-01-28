@@ -7,8 +7,8 @@ kidneys_df: /home/mithil/PycharmProjects/SenNetKideny/data/train_rles_kidneys.cs
 labels_df: /home/mithil/PycharmProjects/SenNetKideny/data/kidney_2_solution.csv
 lr: 5e-04
 min_lr: 3e-05
-model_dir: /home/mithil/PycharmProjects/SenNetKideny/models/maxvit_base_tf_224_fixed_lr_scheduler_no_kidney
-model_name: tu-timm/maxvit_base_tf_224.in1k
+model_dir: /home/mithil/PycharmProjects/SenNetKideny/models/upernet_swin_base_lr_scheduler_no_kidney_224
+model_name: openmmlab/upernet-swin-base
 num_workers: 2
 pad_factor: 224
 seed: 42

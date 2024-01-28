@@ -6,6 +6,9 @@ from nextvit import *
 from segmentation_models_pytorch.base.heads import SegmentationHead
 from torch import nn
 import torch
+from transformers import UperNetForSemanticSegmentation
+from maxvit_decoder import MaxViTDecoder
+
 
 def return_model(model_name: str, in_channels: int, classes: int):
     model = smp.Unet(
@@ -16,6 +19,41 @@ def return_model(model_name: str, in_channels: int, classes: int):
 
     )
     return model
+
+
+class ReturnModelUperNet(nn.Module):
+    def __init__(self, model_name: str, in_channels: int, classes: int, pad_factor: int):
+        super(ReturnModelUperNet, self).__init__()
+        id2label = {"0": "kidney"}
+        label2id = {"kidney": 0}
+        self.model = UperNetForSemanticSegmentation.from_pretrained(model_name, id2label=id2label,
+                                                                    label2id=label2id,
+                                                                    ignore_mismatched_sizes=True)
+        self.pad_factor = pad_factor
+
+    def forward(self, x):
+        original_size = x.shape[2:]
+        x, pad = _pad_image(x, pad_factor=self.pad_factor)
+        x = checkpoint(self.model, x, use_reentrant=True).logits
+        # x = self.model.decode_head(*x)
+        x = _unpad(x, original_size, pad)
+        return x
+
+
+def _pad_image(x: torch.Tensor, pad_factor: int = 224):
+    h, w = x.shape[2], x.shape[3]
+    h_pad = (pad_factor - h % pad_factor) % pad_factor
+    w_pad = (pad_factor - w % pad_factor) % pad_factor
+
+    # Calculate padding
+    pad = [w_pad // 2, w_pad - w_pad // 2, h_pad // 2, h_pad - h_pad // 2]
+    x = nn.functional.pad(x, pad, mode='constant', value=0)
+    return x, pad
+
+
+def _unpad(x, original_size, pad):
+    h, w = original_size
+    return x[:, :, pad[2]:h + pad[2], pad[0]:w + pad[0]]
 
 
 class ReturnModel(nn.Module):
@@ -31,30 +69,12 @@ class ReturnModel(nn.Module):
 
     def forward(self, x):
         original_size = x.shape[2:]
-        x, pad = self._pad_image(x, pad_factor=self.pad_factor)
+        x, pad = _pad_image(x, pad_factor=self.pad_factor)
         x = checkpoint(self.unet.encoder, x, use_reentrant=True)
         x = self.unet.decoder(*x)
         x = self.unet.segmentation_head(x)
-        x = self._unpad(x, original_size, pad)
+        x = _unpad(x, original_size, pad)
         return x
-
-
-    def _pad_image(self, x: torch.Tensor, pad_factor: int = 224):
-        h, w = x.shape[2], x.shape[3]
-        h_pad = (pad_factor - h % pad_factor) % pad_factor
-        w_pad = (pad_factor - w % pad_factor) % pad_factor
-
-        # Calculate padding
-        pad = [w_pad // 2, w_pad - w_pad // 2, h_pad // 2, h_pad - h_pad // 2]
-        x = nn.functional.pad(x, pad, mode='constant', value=0)
-        return x, pad
-
-    def _unpad(self, x, original_size, pad):
-        h, w = original_size
-        return x[:, :, pad[2]:h + pad[2], pad[0]:w + pad[0]]
-
-
-
 
 
 class ReturnModelDepth6(nn.Module):
@@ -113,27 +133,24 @@ class ReturnModelDepth6(nn.Module):
         return x[:, :, pad[2]:h + pad[2], pad[0]:w + pad[0]]
 
 
-class ReturnModelNextVit(nn.Module):
+class ReturnModelMaxViTDecoder(nn.Module):
     def __init__(self, model_name: str, in_channels: int, classes: int, pad_factor: int):
-        super(ReturnModelNextVit, self).__init__()
+        super(ReturnModelMaxViTDecoder, self).__init__()
         # Initialize the Unet model
         if not model_name.startswith("nextvit"):
             raise ValueError("This Class is only for NextVit models")
         self.decoder_channels = (256, 128, 64, 32, 16)
         self.encoder = timm.create_model(model_name)
-        self.decoder = UnetDecoder(
-            decoder_channels=self.decoder_channels,
-            encoder_channels=(3, 64, 96, 256, 512, 1024),
-            n_blocks=5,
-            use_batchnorm=True,
-            center=False,
-            attention_type=None,
-        )
-        self.segmentation_head = SegmentationHead(
-            in_channels=self.decoder_channels[-1],
-            out_channels=classes,
-            activation=None,
-            kernel_size=3,
+        self.decoder = MaxViTDecoder(
+            in_channels=(64, 96, 192, 384, 768),
+            depths=(2, 2, 2, 2),
+            grid_window_size=(7, 7),
+            attn_drop=0.2,
+            drop=0.2,
+            drop_path=0.2,
+            debug=True,
+            channels=64,
+            num_classes=1,
         )
         self.pad_factor = pad_factor
 
@@ -142,7 +159,6 @@ class ReturnModelNextVit(nn.Module):
         x, pad = self._pad_image(x, pad_factor=self.pad_factor)
         features = checkpoint(self.encoder, x)
         x = self.decoder(*features)
-        x = self.segmentation_head(x)
         x = self._unpad(x, original_size, pad)
         return x
 

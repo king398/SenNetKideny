@@ -1,7 +1,5 @@
 import gc
 from torch.utils.checkpoint import checkpoint
-import re
-import albumentations
 import numpy as np
 import os
 from torch.utils.data import Dataset, DataLoader
@@ -17,12 +15,22 @@ from tqdm.auto import tqdm
 import glob
 from torch import nn
 import pandas as pd
-from albumentations import CenterCrop
 from typing import Literal
 from skimage import filters
 
 
-def apply_hysteresis_thresholding(volume: np.array, low: float, high: float, chunk_size: int = 32):
+def apply_hysteresis_thresholding(volume: np.array, low: float, high: float, chunk_size: int = 2):
+    """
+    Applies hysteresis thresholding to a 3D numpy array.
+
+    :param volume: 3D numpy array.
+    :param low: Low threshold.
+    :param high: High threshold.
+    :param chunk_size: Size of the chunks to process at once.
+    :return: Thresholded volume.
+    """
+    # Apply hysteresis thresholding to each slice in the volume
+
     D, H, W = volume.shape
     predict = np.zeros((D, H, W), np.uint8)
 
@@ -33,19 +41,6 @@ def apply_hysteresis_thresholding(volume: np.array, low: float, high: float, chu
         )
 
     return predict
-
-
-def choose_biggest_object(mask: np.array, threshold: float) -> np.array:
-    mask = ((mask > threshold) * 255).astype(np.uint8)
-    num_label, label, stats, centroid = cv2.connectedComponentsWithStats(mask, connectivity=8)
-    max_label = -1
-    max_area = -1
-    for l in range(1, num_label):
-        if stats[l, cv2.CC_STAT_AREA] >= max_area:
-            max_area = stats[l, cv2.CC_STAT_AREA]
-            max_label = l
-    processed = (label == max_label).astype(np.uint8)
-    return processed
 
 
 def rle_encode(mask: np.array) -> str:
@@ -63,6 +58,8 @@ def get_valid_transform(image: np.array) -> np.array:
     transform = Compose([
         ToTensorV2(),
     ])
+
+    # Apply the transformation
     return transform(image=image)['image']
 
 
@@ -118,12 +115,12 @@ class ImageDataset(Dataset):
         image_shape = tuple(str(element) for element in image_shape)
 
         image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
-        image = self.transform(image=image)
+        image = self.transform(image=image, )
         return image, image_shape, image_id
 
 
 class ReturnModel(nn.Module):
-    def __init__(self, model_name: str, in_channels: int, classes: int, pad_factor: int = 224):
+    def __init__(self, model_name: str, in_channels: int, classes: int, pad_factor: int):
         super(ReturnModel, self).__init__()
         self.unet = smp.Unet(
             encoder_name=model_name,
@@ -191,52 +188,65 @@ def inference_loop(model: nn.Module, images: torch.Tensor) -> torch.Tensor:
 
 def inference_fn(model: nn.Module, data_loader: DataLoader, data_loader_xz: DataLoader, data_loader_yz: DataLoader,
                  device: torch.device,
-                 volume_shape: Tuple) -> Tuple[np.array, list]:
+                 volume_shape: Tuple) -> Tuple[list, list]:
     torch.cuda.empty_cache()
     model.eval()
+    rles_list = []
     image_ids_all = []
     volume = np.zeros(volume_shape, dtype=np.float16)
-    modes = ["xy", "xz", "yz"]
-    for mode in modes:
-        global_counter = 0
-        match mode:
-            case "xy":
-                stream = tqdm(data_loader, total=len(data_loader))
-            case "xz":
-                stream = tqdm(data_loader_xz, total=len(data_loader_xz))
-            case "yz":
-                stream = tqdm(data_loader_yz, total=len(data_loader_yz))
-            case _:
-                raise ValueError("Invalid mode")
-        for i, (images, image_shapes, image_ids) in enumerate(stream):
-            images = images.to(device, non_blocking=True).float()
-            outputs = inference_loop(model, images)
+    global_counter = 0
+    for i, (images, image_shapes, image_ids) in tqdm(enumerate(data_loader), total=len(data_loader)):
+        images = images.to(device, non_blocking=True).float()
+        outputs: torch.Tensor = inference_loop(model, images)
 
-            for j, image in enumerate(outputs):
-                kidney = image[1, :, :]
-                kidney = choose_biggest_object(kidney.numpy(), 0.5)
-                output_mask = image[0, :, :]
-                output_mask = output_mask.numpy() * kidney
-                image_ids_all.append(image_ids[j])
-                match mode:
-                    case "xy":
-                        volume[global_counter] += output_mask
-                    case "xz":
-                        volume[:, global_counter] += output_mask
-                    case "yz":
-                        volume[:, :, global_counter] += output_mask
-                global_counter += 1
-                del image, output_mask, kidney
-            del outputs, images
-            gc.collect()
+        for j, image in enumerate(outputs):
+            output_mask = image[0, :, :].numpy()
+            print(output_mask.shape)
+            image_ids_all.append(image_ids[j])
+            volume[global_counter] += output_mask
+            global_counter += 1
+            del image, output_mask
+        del outputs, images
+        gc.collect()
+    global_counter = 0
+    for i, (images, image_shapes, image_ids) in tqdm(enumerate(data_loader_xz), total=len(data_loader_xz)):
+        images = images.to(device, non_blocking=True).float()
+        outputs = inference_loop(model, images)
 
-    volume = volume / 3
+        for j, image in enumerate(outputs):
+            output_mask = image[0, :, :].numpy()
+
+            volume[:, global_counter] += output_mask
+            global_counter += 1
+            del image, output_mask
+        del outputs, images
+
     gc.collect()
-    return volume, image_ids_all
+    global_counter = 0
+    for i, (images, image_shapes, image_ids) in tqdm(enumerate(data_loader_yz), total=len(data_loader_yz)):
+        images = images.to(device, non_blocking=True).float()
+        outputs = inference_loop(model, images)
+        for j, image in enumerate(outputs):
+            output_mask = image[0, :, :].numpy()
 
-def extract_number(filename):
-    match = re.search(r'(\d+)', filename)
-    return int(match.group()) if match else None
+            volume[:, :, global_counter] += output_mask
+            global_counter += 1
+            del image, output_mask
+        del outputs, images
+
+    gc.collect()
+    volume = volume / 3
+    volume = apply_hysteresis_thresholding(volume, 0.2, 0.6)
+
+    # volume = volume > 0.2
+    # volume = (volume * 255).astype(np.uint8)
+    for output_mask in volume:
+        # output_mask = output_mask > 0.2
+        output_mask = (output_mask * 255).astype(np.uint8)
+        rles_list.append(rle_encode(output_mask))
+    del volume
+    gc.collect()
+    return rles_list, image_ids_all
 
 
 def norm_by_percentile(volume, low=10, high=99.8, alpha=0.01):
@@ -246,6 +256,7 @@ def norm_by_percentile(volume, low=10, high=99.8, alpha=0.01):
     if 1:
         x[x > 1] = (x[x > 1] - 1) * alpha + 1
         x[x < 0] = (x[x < 0]) * alpha
+    # x = np.clip(x,0,1)
     return x
 
 
@@ -253,18 +264,20 @@ def main(cfg: dict):
     seed_everything(cfg['seed'])
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     test_dirs = sorted(glob.glob(f"{cfg['test_dir']}/*"))
+    model = ReturnModel(cfg['model_name'], cfg['in_channels'], cfg['classes'], pad_factor=224)
+    model.to(device)
+    model.load_state_dict(torch.load(cfg["model_path"], map_location=torch.device('cuda')), strict=True)
+    model = nn.DataParallel(model)
 
     global_rle_list = []
     global_image_ids = []
 
     for test_dir in test_dirs:
-        model = ReturnModel(cfg['model_name_1'], cfg['in_channels'], cfg['classes'], pad_factor=32)
-        model.to(device)
-        model.load_state_dict(torch.load(cfg["model_path_1"], map_location=torch.device('cuda')), strict=True)
-        model = nn.DataParallel(model)
         test_files = sorted(glob.glob(f"{test_dir}/images/*.tif"))
+        print(test_files)
         volume = np.stack([cv2.imread(i, cv2.IMREAD_GRAYSCALE) for i in test_files])
         volume = norm_by_percentile(volume).astype(np.float32)
+        print(volume.shape)
         test_dataset_xy = ImageDataset(test_files, get_valid_transform, mode='xy', volume=volume)
         test_dataset_xz = ImageDataset(test_files, get_valid_transform, mode='xz',
                                        volume=volume)
@@ -276,32 +289,12 @@ def main(cfg: dict):
                                     num_workers=cfg['num_workers'], pin_memory=True)
         test_loader_yz = DataLoader(test_dataset_yz, batch_size=cfg['batch_size'], shuffle=False,
                                     num_workers=cfg['num_workers'], pin_memory=True)
-        volume_1, image_ids = inference_fn(model=model, data_loader=test_loader, data_loader_xz=test_loader_xz,
-                                           data_loader_yz=test_loader_yz,
-                                           device=device, volume_shape=volume.shape[:3])
-        # save volume_1 as npy file
-        np.save(f"volume_1.npy", volume_1)
-        model = ReturnModel(cfg['model_name_2'], cfg['in_channels'], cfg['classes'], pad_factor=224)
-        model.to(device)
-        model.load_state_dict(torch.load(cfg["model_path_2"], map_location=torch.device('cuda')), strict=True)
-        model = nn.DataParallel(model)
-        volume_2, image_ids = inference_fn(model=model, data_loader=test_loader, data_loader_xz=test_loader_xz,
-                                           data_loader_yz=test_loader_yz,
-                                           device=device, volume_shape=volume.shape[:3])
-        rles_list = []
-        volume_2 = (np.load(f"volume_1.npy") + volume_2) / 2
-        volume_2 = apply_hysteresis_thresholding(volume_2, 0.2, 0.6)
-        volume_2 = (volume_2 * 255).astype(np.uint8)
-        for output_mask in volume_2:
-            output_mask = (output_mask * 255).astype(np.uint8)
-            rles_list.append(rle_encode(output_mask))
-
-        gc.collect()
-
+        rles_list, image_ids = inference_fn(model=model, data_loader=test_loader, data_loader_xz=test_loader_xz,
+                                            data_loader_yz=test_loader_yz,
+                                            device=device, volume_shape=volume.shape[:3])
         global_rle_list.extend(rles_list)
         global_image_ids.extend(image_ids)
-        del volume_2, test_dataset_xy, test_dataset_xz, test_dataset_yz, test_loader, test_loader_xz, test_loader_yz
-        os.remove(f"volume_1.npy")
+        del volume, test_dataset_xy, test_dataset_xz, test_dataset_yz, test_loader, test_loader_xz, test_loader_yz
     submission = pd.DataFrame()
     submission['id'] = global_image_ids
     submission['rle'] = global_rle_list
@@ -311,14 +304,12 @@ def main(cfg: dict):
 
 config = {
     "seed": 42,
-    "model_name_1": "tu-timm/dm_nfnet_f1.dm_in1k",
+    "model_name": "tu-timm/maxvit_base_tf_224.in1k",
     "in_channels": 3,
-    "classes": 2,
+    "classes": 1,
     "test_dir": '/kaggle/input/blood-vessel-segmentation/test',
-    "model_path_1": "/kaggle/input/senet-model-2/dm_nfnet_f1_volume_normalize_dice_find_best_epoch_kidney_3_dense/model_epoch_3.pth",
-    "model_name_2": "tu-timm/maxvit_base_tf_224.in1k",
-    "model_path_2": "/kaggle/input/senet-model-2/maxvit_base_tf_224_volume_normalize_dice_kidney_3_dense/model_epoch_3.pth",
-    "batch_size": 16,
+    "model_path": "/kaggle/input/senet-model-3/maxvit_base_tf_224_fixed_lr_scheduler_no_kidney/model_best_surface_dice.pth",
+    "batch_size": 8,
     "num_workers": 4,
     "threshold": 0.15,
 }
