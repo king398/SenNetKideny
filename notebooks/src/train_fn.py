@@ -7,10 +7,10 @@ from accelerate import Accelerator
 import pandas as pd
 from metric import compute_surface_dice_score
 from dataset import CombinedDataLoader
-import gc
+from augmentations import get_mosaic_2x2
 
 dice = Dice()
-dice_valid = dicevalid()
+dice_valid = Dice_Valid()
 
 tqdm_color = get_color_escape(0, 229, 255)  # Red color for example
 tqdm_style = {
@@ -41,6 +41,8 @@ def train_fn(
         with accelerator.accumulate(model):
             masks = masks.float().contiguous()
             images = images.float().contiguous()
+            # images = get_mosaic_2x2(images)
+            # masks = get_mosaic_2x2(masks)
             output = model(images)
             loss = criterion(output, masks)
             accelerator.backward(loss)
@@ -66,7 +68,9 @@ def validation_fn(
         labels_df: pd.DataFrame,
         model_dir: str,
 ):
+    labels_df_new = labels_df.copy()
     # after the 900th keep all the rows
+    labels_df_new = labels_df_new[900:].reset_index(drop=True)
     gc.collect()
     torch.cuda.empty_cache()
     model.eval()
@@ -88,13 +92,18 @@ def validation_fn(
             image_ids = accelerator.gather_for_metrics(image_ids)
             loss_metric += loss.item() / (i + 1)
             outputs = outputs.sigmoid()
+            outputs_not_multiply = outputs.detach().clone()
             stream.set_description(
                 f"Epoch:{epoch + 1}, valid_loss: {loss_metric:.5f}")
-            dice_batch = dice_valid(outputs, masks)
+            outputs_not_multiply = outputs_not_multiply.detach().cpu().float().numpy()
+            outputs = outputs[:, 0, :, :] * outputs[:, 1, :, :]
+            dice_batch = dice_valid(outputs, masks[:, 0, :, :])
             dice_list.append(dice_batch.item())
 
-            for p, image, in enumerate(outputs, ):
-                output_mask = image.detach().cpu().numpy()
+            for p, image, in enumerate(outputs_not_multiply, ):
+                kidney = image[1, :, :]
+                kidney = choose_biggest_object(kidney, 0.5)
+                output_mask = image[0, :, :] * kidney
                 # iterate from threshold 0.1 to 0.5
                 threshold = [0.1, 0.2, 0.3, 0.4, 0.5]
 
@@ -110,12 +119,9 @@ def validation_fn(
     for m, pd_dataframe in enumerate(pd_dataframes):
         m += 1
         pd_dataframe = pd.DataFrame(pd_dataframe)
+
         #     # drop all duplicates in the dataframe
         pd_dataframe = pd_dataframe.drop_duplicates(subset=['id'])
-        # drop the ids which are not present in pd_dataframe from labels_df_new
-        labels_df_new = labels_df.copy()
-
-        labels_df_new = labels_df_new[labels_df_new['id'].isin(pd_dataframe['id'])].reset_index(drop=True)
         surface_dice = compute_surface_dice_score(submit=pd_dataframe, label=labels_df_new)
         threshold_score_dict.update({f"threshold_{m / 10}": surface_dice})
     max_surface_dice = max(threshold_score_dict.values())
