@@ -8,9 +8,10 @@ import pandas as pd
 from metric import compute_surface_dice_score
 from dataset import CombinedDataLoader
 from augmentations import get_mosaic_2x2
+import gc
 
 dice = Dice()
-dice_valid = Dice_Valid()
+dice_valid = Dice()
 
 tqdm_color = get_color_escape(0, 229, 255)  # Red color for example
 tqdm_style = {
@@ -70,7 +71,7 @@ def validation_fn(
 ):
     labels_df_new = labels_df.copy()
     # after the 900th keep all the rows
-    labels_df_new = labels_df_new[900:].reset_index(drop=True)
+    #labels_df_new = labels_df_new[900:].reset_index(drop=True)
     gc.collect()
     torch.cuda.empty_cache()
     model.eval()

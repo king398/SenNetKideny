@@ -1,4 +1,4 @@
-from albumentations import Compose, CenterCrop
+from albumentations import Compose, CenterCrop, RandomScale, PadIfNeeded
 from albumentations.pytorch import ToTensorV2
 import torch
 from torchvision.transforms import v2
@@ -26,7 +26,8 @@ def get_mosaic_2x2(four_images_batch):
         for j in range(2):
             im = cc(four_images_batch[i * 2 + j])
             final[:, i * h:i * h + h, j * w:j * w + w] = im
-    return torch.cat([four_images_batch,final.unsqueeze(0)])
+    return torch.cat([four_images_batch, final.unsqueeze(0)])
+
 
 def CutMix(images: torch.tensor, masks: torch.tensor):
     y = torch.randint(4, (images.shape[0],), dtype=torch.long)
@@ -34,6 +35,16 @@ def CutMix(images: torch.tensor, masks: torch.tensor):
     cutmix = v2.CutMix(num_classes=4)
     cutmixed_images_masks, _ = cutmix(concat, y)
     return cutmixed_images_masks[:, 0:3], cutmixed_images_masks[:, 3:]
+
+
+def random_scale(image, original_shape):
+    height, width = original_shape
+    transform = Compose([
+        RandomScale(scale_limit=0.2, p=1.0),  # scale_limit can be adjusted
+        PadIfNeeded(min_height=height, min_width=width, p=1.0),
+        CenterCrop(height=height, width=width, p=1.0)
+    ])
+    return transform(image=image)['image']
 
 
 def reverse_padding(image: int, original_height: int, original_width: int):

@@ -45,7 +45,7 @@ class ImageDataset(Dataset):
         mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
         mask = mask / 255
         kidney_mask = rle_decode(self.kidney_rle[item], img_shape=mask.shape)
-        #mask = np.stack([mask, kidney_mask], axis=2)
+        mask = np.stack([mask, kidney_mask], axis=2)
         augmented = self.transform(image=image, mask=mask)
         image = augmented["image"]
         mask = augmented["mask"]
