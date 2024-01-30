@@ -1,16 +1,19 @@
+import cv2
 import numpy as np
-from albumentations import Compose, CenterCrop, RandomScale, PadIfNeeded
+from albumentations import Compose, CenterCrop, RandomScale, PadIfNeeded, Affine
 from albumentations.pytorch import ToTensorV2
 import torch
 from torchvision.transforms import v2
 from torchvision.transforms import transforms as T
 from typing import Tuple
 
+
 def get_train_transform(height: int = 1344, width: int = 1120) -> Compose:
     return Compose([
         # RandomBrightnessContrast(p=0.05,),
         # HorizontalFlip(p=0.5),
         # VerticalFlip(p=0.5),
+        Affine(p=0.2, shear=10, rotate=10, scale=0.1, interpolation=cv2.INTER_CUBIC),
         ToTensorV2(transpose_mask=True), ])
 
 
@@ -38,14 +41,15 @@ def CutMix(images: torch.tensor, masks: torch.tensor):
     return cutmixed_images_masks[:, 0:3], cutmixed_images_masks[:, 3:]
 
 
-def random_scale(image:np.array, original_shape:Tuple[int, int]):
+def random_scale(image: np.array, mask: np.array, original_shape: Tuple[int, int]):
     height, width = original_shape
     transform = Compose([
         RandomScale(scale_limit=0.2, p=1.0),  # scale_limit can be adjusted
         PadIfNeeded(min_height=height, min_width=width, p=1.0),
         CenterCrop(height=height, width=width, p=1.0)
     ])
-    return transform(image=image)['image']
+    transform_image = transform(image=image, mask=mask)
+    return transform_image['image'], transform_image['mask']
 
 
 def reverse_padding(image: int, original_height: int, original_width: int):

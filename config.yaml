@@ -1,13 +1,13 @@
 batch_size: 4
 classes: 2
-epochs: 30
+epochs: 20
 gradient_accumulation_steps: 1
 in_channels: 3
 kidneys_df: /home/mithil/PycharmProjects/SenNetKideny/data/train_rles_kidneys_diff.csv
 labels_df: /home/mithil/PycharmProjects/SenNetKideny/data/kidney_3_dense_full.csv
 lr: 5e-04
 min_lr: 3e-05
-model_dir: /home/mithil/PycharmProjects/SenNetKideny/models/maxvit_base_tf_224_kid_3_dense_validation_1_0_for_kid_2_add_fixed_kidney
+model_dir: /home/mithil/PycharmProjects/SenNetKideny/models/maxvit_base_tf_224_affine_kidney_3_val
 model_name: tu-timm/maxvit_base_tf_224.in1k
 num_workers: 2
 pad_factor: 224

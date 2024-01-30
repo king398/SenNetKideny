@@ -42,14 +42,14 @@ class ImageDataset(Dataset):
                 raise ValueError("Invalid mode")
 
         image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
-        if self.train:
-            image = random_scale(image, original_shape=image.shape[:2])
 
         mask = cv2.imread(self.mask_paths[item])
         mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
         mask = mask / 255
         kidney_mask = rle_decode(self.kidney_rle[item], img_shape=mask.shape)
         mask = np.stack([mask, kidney_mask], axis=2)
+        if 0:
+            image,mask = random_scale(image, mask,original_shape=image.shape[:2])
 
         augmented = self.transform(image=image, mask=mask)
 
