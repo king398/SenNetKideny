@@ -50,7 +50,7 @@ def main(cfg):
     train_dataset = ImageDataset(train_images, train_masks, get_train_transform(), train_kidneys_rle, train_volume,
                                  mode="xy")
     valid_dataset = ImageDataset(validation_images, validation_masks, get_valid_transform(),
-                                 validation_kidneys_rle, validation_volume, mode="xy")
+                                 validation_kidneys_rle, validation_volume, mode="xy", train=False)
     train_dataset_xz = ImageDataset(train_images_xz, train_masks_xz, get_train_transform(),
                                     train_xz_kidneys_rle, train_volume, mode="xz")
     train_dataset_yz = ImageDataset(train_images_yz, train_masks_yz, get_train_transform(),
@@ -72,7 +72,7 @@ def main(cfg):
                         pad_factor=cfg['pad_factor'], )
     optimizer = torch.optim.AdamW(model.parameters(), lr=float(cfg['lr']))
     scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=int(
-        (len(train_loader) + len(train_loader_yz) + len(train_loader_xz) + len(train_loader_2)) * 10),
+        (len(train_loader) + len(train_loader_yz) + len(train_loader_xz)) * 10),
                                                                      eta_min=float(cfg['min_lr']))
     (train_loader, valid_loader, model, optimizer, scheduler, train_loader_yz, train_loader_xz, train_loader_2,
 

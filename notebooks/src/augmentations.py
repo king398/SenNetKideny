@@ -1,9 +1,10 @@
+import numpy as np
 from albumentations import Compose, CenterCrop, RandomScale, PadIfNeeded
 from albumentations.pytorch import ToTensorV2
 import torch
 from torchvision.transforms import v2
 from torchvision.transforms import transforms as T
-
+from typing import Tuple
 
 def get_train_transform(height: int = 1344, width: int = 1120) -> Compose:
     return Compose([
@@ -37,7 +38,7 @@ def CutMix(images: torch.tensor, masks: torch.tensor):
     return cutmixed_images_masks[:, 0:3], cutmixed_images_masks[:, 3:]
 
 
-def random_scale(image, original_shape):
+def random_scale(image:np.array, original_shape:Tuple[int, int]):
     height, width = original_shape
     transform = Compose([
         RandomScale(scale_limit=0.2, p=1.0),  # scale_limit can be adjusted

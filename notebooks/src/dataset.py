@@ -7,17 +7,19 @@ from albumentations import Compose
 from typing import Tuple, List, Literal
 import torch
 import random
+from augmentations import random_scale
 
 
 class ImageDataset(Dataset):
     def __init__(self, image_paths: List[str], mask_paths: List[str], transform: Compose, kidney_rle: List[str],
-                 volume: np.array, mode: Literal["xy", "yz", "xz"] = "xy", ):
+                 volume: np.array, mode: Literal["xy", "yz", "xz"] = "xy", train: bool = True):
         self.image_paths = image_paths
         self.mask_paths = mask_paths
         self.kidney_rle = kidney_rle
         self.transform = transform
         self.volume = volume
         self.mode = mode
+        self.train = train
 
     def __len__(self) -> int:
         match self.mode:
@@ -40,13 +42,17 @@ class ImageDataset(Dataset):
                 raise ValueError("Invalid mode")
 
         image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
+        if self.train:
+            image = random_scale(image, original_shape=image.shape[:2])
 
         mask = cv2.imread(self.mask_paths[item])
         mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
         mask = mask / 255
         kidney_mask = rle_decode(self.kidney_rle[item], img_shape=mask.shape)
         mask = np.stack([mask, kidney_mask], axis=2)
+
         augmented = self.transform(image=image, mask=mask)
+
         image = augmented["image"]
         mask = augmented["mask"]
         image_id = self.image_paths[item].split("/")[-1].split(".")[0]
