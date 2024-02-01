@@ -5,7 +5,7 @@ from notebooks.src.utils import rle_decode, rle_encode
 
 import pandas as pd
 
-volume = "kidney_3_sparse"
+volume = "kidney_1_dense"
 data_dir = f"/home/mithil/PycharmProjects/SenNetKideny/data/train/{volume}"
 kidneys_rle = pd.read_csv("/home/mithil/PycharmProjects/SenNetKideny/data/train_rles_kidneys.csv")
 # convert kidney_rle to a dict
@@ -24,10 +24,10 @@ for i in range(len(os.listdir(f'{data_dir}/labels/'))):
     kidney_masks.append(rle_decode(kidneys_rle['kidney_rle'][i], img_shape=v.shape))
 masks = np.stack(masks)
 # dense mask to be loaded from the disk
-masks_dense = np.stack([cv2.imread(
-    f"/home/mithil/PycharmProjects/SenNetKideny/data/train/kidney_3_dense/labels/{i:04d}.tif", cv2.IMREAD_GRAYSCALE) for
-    i in range(496, 997)])
-masks[496:997] = masks_dense
+#masks_dense = np.stack([cv2.imread(
+#    f"/home/mithil/PycharmProjects/SenNetKideny/data/train/kidney_3_dense/labels/{i:04d}.tif", cv2.IMREAD_GRAYSCALE) for
+#    i in range(496, 997)])
+#masks[496:997] = masks_dense
 images = np.stack(images)
 kidney_masks = np.stack(kidney_masks)
 dataset_xz = (images, masks, kidney_masks)

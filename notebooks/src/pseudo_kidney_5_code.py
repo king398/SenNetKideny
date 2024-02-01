@@ -1,10 +1,14 @@
 import gc
+
+from numpy import ndarray, dtype, floating
 from torch.utils.checkpoint import checkpoint
+import re
+import albumentations
 import numpy as np
 import os
 from torch.utils.data import Dataset, DataLoader
 import cv2
-from typing import Tuple
+from typing import Tuple, Any
 import torch
 from albumentations import *
 from albumentations.pytorch import ToTensorV2
@@ -15,11 +19,12 @@ from tqdm.auto import tqdm
 import glob
 from torch import nn
 import pandas as pd
+from albumentations import CenterCrop
 from typing import Literal
 from skimage import filters
 
 
-def apply_hysteresis_thresholding(volume: np.array, low: float, high: float, chunk_size: int = 2):
+def apply_hysteresis_thresholding(volume: np.array, low: float, high: float, chunk_size: int = 32):
     """
     Applies hysteresis thresholding to a 3D numpy array.
 
@@ -43,6 +48,19 @@ def apply_hysteresis_thresholding(volume: np.array, low: float, high: float, chu
     return predict
 
 
+def choose_biggest_object(mask: np.array, threshold: float) -> np.array:
+    mask = ((mask > threshold) * 255).astype(np.uint8)
+    num_label, label, stats, centroid = cv2.connectedComponentsWithStats(mask, connectivity=8)
+    max_label = -1
+    max_area = -1
+    for l in range(1, num_label):
+        if stats[l, cv2.CC_STAT_AREA] >= max_area:
+            max_area = stats[l, cv2.CC_STAT_AREA]
+            max_label = l
+    processed = (label == max_label).astype(np.uint8)
+    return processed
+
+
 def rle_encode(mask: np.array) -> str:
     pixel = mask.flatten()
     pixel = np.concatenate([[0], pixel, [0]])
@@ -55,6 +73,16 @@ def rle_encode(mask: np.array) -> str:
 
 
 def get_valid_transform(image: np.array) -> np.array:
+    """
+    Crops the padded image back to its original dimensions.
+
+    :param image: Padded image.
+    :param original_height: Original height of the image before padding.
+    :param original_width: Original width of the image before padding.
+    :return: Cropped image with original dimensions.
+    """
+    # Define the cropping transformation
+    # round up original height and width to nearest 32
     transform = Compose([
         ToTensorV2(),
     ])
@@ -115,16 +143,17 @@ class ImageDataset(Dataset):
         image_shape = tuple(str(element) for element in image_shape)
 
         image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
-        image = self.transform(image=image, )
+        image = self.transform(image=image)
         return image, image_shape, image_id
 
 
 class ReturnModel(nn.Module):
     def __init__(self, model_name: str, in_channels: int, classes: int, pad_factor: int):
         super(ReturnModel, self).__init__()
+        # Initialize the Unet model
         self.unet = smp.Unet(
             encoder_name=model_name,
-            encoder_weights=None,
+            encoder_weights="imagenet",
             in_channels=in_channels,
             classes=classes,
         )
@@ -152,6 +181,22 @@ class ReturnModel(nn.Module):
     def _unpad(self, x, original_size, pad):
         h, w = original_size
         return x[:, :, pad[2]:h + pad[2], pad[0]:w + pad[0]]
+
+
+def reverse_padding(image: np.array, original_height: int, original_width: int):
+    """
+    Crops the padded image back to its original dimensions.
+
+    :param image: Padded image.
+    :param original_height: Original height of the image before padding.
+    :param original_width: Original width of the image before padding.
+    :return: Cropped image with original dimensions.
+    """
+    # Define the cropping transformation
+    transform = CenterCrop(height=original_height, width=original_width)
+
+    # Apply the transformation
+    return transform(image=image)['image']
 
 
 def inference_loop(model: nn.Module, images: torch.Tensor) -> torch.Tensor:
@@ -188,65 +233,46 @@ def inference_loop(model: nn.Module, images: torch.Tensor) -> torch.Tensor:
 
 def inference_fn(model: nn.Module, data_loader: DataLoader, data_loader_xz: DataLoader, data_loader_yz: DataLoader,
                  device: torch.device,
-                 volume_shape: Tuple) -> Tuple[list, list]:
+                 volume_shape: Tuple) -> ndarray[Any, dtype[floating[Any]]]:
     torch.cuda.empty_cache()
     model.eval()
-    rles_list = []
-    image_ids_all = []
-    volume = np.zeros(volume_shape, dtype=np.float16)
+    volume = torch.zeros((2, *volume_shape), dtype=torch.float16)
     global_counter = 0
     for i, (images, image_shapes, image_ids) in tqdm(enumerate(data_loader), total=len(data_loader)):
         images = images.to(device, non_blocking=True).float()
-        outputs: torch.Tensor = inference_loop(model, images)
-
-        for j, image in enumerate(outputs):
-            output_mask = image[0, :, :].numpy()
-            print(output_mask.shape)
-            image_ids_all.append(image_ids[j])
-            volume[global_counter] += output_mask
+        outputs = inference_loop(model, images)
+        #outputs = outputs.numpy()
+        for image in outputs[:]:
+            volume[:, global_counter] += image
             global_counter += 1
-            del image, output_mask
-        del outputs, images
-        gc.collect()
+
     global_counter = 0
     for i, (images, image_shapes, image_ids) in tqdm(enumerate(data_loader_xz), total=len(data_loader_xz)):
         images = images.to(device, non_blocking=True).float()
         outputs = inference_loop(model, images)
-
-        for j, image in enumerate(outputs):
-            output_mask = image[0, :, :].numpy()
-
-            volume[:, global_counter] += output_mask
+        #outputs = outputs.numpy()
+        for image in outputs[:]:
+            volume[:, :, global_counter] += image
             global_counter += 1
-            del image, output_mask
-        del outputs, images
 
     gc.collect()
     global_counter = 0
     for i, (images, image_shapes, image_ids) in tqdm(enumerate(data_loader_yz), total=len(data_loader_yz)):
         images = images.to(device, non_blocking=True).float()
         outputs = inference_loop(model, images)
-        for j, image in enumerate(outputs):
-            output_mask = image[0, :, :].numpy()
-
-            volume[:, :, global_counter] += output_mask
+        #outputs = outputs.numpy()
+        for image in outputs[:]:
+            volume[:, :, :, global_counter] += image
             global_counter += 1
-            del image, output_mask
-        del outputs, images
-
     gc.collect()
     volume = volume / 3
-    volume = apply_hysteresis_thresholding(volume, 0.2, 0.6)
 
-    # volume = volume > 0.2
-    # volume = (volume * 255).astype(np.uint8)
-    for output_mask in volume:
-        # output_mask = output_mask > 0.2
-        output_mask = (output_mask * 255).astype(np.uint8)
-        rles_list.append(rle_encode(output_mask))
-    del volume
-    gc.collect()
-    return rles_list, image_ids_all
+    return volume.numpy()
+
+
+def extract_number(filename):
+    match = re.search(r'(\d+)', filename)
+    return int(match.group()) if match else None
 
 
 def norm_by_percentile(volume, low=10, high=99.8, alpha=0.01):
@@ -263,21 +289,16 @@ def norm_by_percentile(volume, low=10, high=99.8, alpha=0.01):
 def main(cfg: dict):
     seed_everything(cfg['seed'])
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    test_dirs = sorted(glob.glob(f"{cfg['test_dir']}/*"))
-    model = ReturnModel(cfg['model_name'], cfg['in_channels'], cfg['classes'], pad_factor=224)
+    test_dirs = ['/home/mithil/PycharmProjects/SenNetKideny/data/train/kidney_5']
+    model = ReturnModel(cfg['model_name'], cfg['in_channels'], cfg['classes'], 224)
     model.to(device)
     model.load_state_dict(torch.load(cfg["model_path"], map_location=torch.device('cuda')), strict=True)
-    model = nn.DataParallel(model)
-
-    global_rle_list = []
-    global_image_ids = []
+    #model = nn.DataParallel(model)
 
     for test_dir in test_dirs:
         test_files = sorted(glob.glob(f"{test_dir}/images/*.tif"))
-        print(test_files)
         volume = np.stack([cv2.imread(i, cv2.IMREAD_GRAYSCALE) for i in test_files])
         volume = norm_by_percentile(volume).astype(np.float32)
-        print(volume.shape)
         test_dataset_xy = ImageDataset(test_files, get_valid_transform, mode='xy', volume=volume)
         test_dataset_xz = ImageDataset(test_files, get_valid_transform, mode='xz',
                                        volume=volume)
@@ -289,28 +310,23 @@ def main(cfg: dict):
                                     num_workers=cfg['num_workers'], pin_memory=True)
         test_loader_yz = DataLoader(test_dataset_yz, batch_size=cfg['batch_size'], shuffle=False,
                                     num_workers=cfg['num_workers'], pin_memory=True)
-        rles_list, image_ids = inference_fn(model=model, data_loader=test_loader, data_loader_xz=test_loader_xz,
-                                            data_loader_yz=test_loader_yz,
-                                            device=device, volume_shape=volume.shape[:3])
-        global_rle_list.extend(rles_list)
-        global_image_ids.extend(image_ids)
+        volume_labels = inference_fn(model=model, data_loader=test_loader, data_loader_xz=test_loader_xz,
+                                     data_loader_yz=test_loader_yz,
+                                     device=device, volume_shape=volume.shape[:3])
+        # create labels dir in test dir
+        os.makedirs(f"{test_dir}/labels", exist_ok=True)
+        np.save(f"{test_dir}/labels/volume.npy", volume_labels)
         del volume, test_dataset_xy, test_dataset_xz, test_dataset_yz, test_loader, test_loader_xz, test_loader_yz
-    submission = pd.DataFrame()
-    submission['id'] = global_image_ids
-    submission['rle'] = global_rle_list
-    submission.to_csv('submission.csv', index=False)
-    print(submission.head())
 
 
 config = {
     "seed": 42,
     "model_name": "tu-timm/maxvit_base_tf_224.in1k",
     "in_channels": 3,
-    "classes": 1,
-    "test_dir": '/kaggle/input/blood-vessel-segmentation/test',
-    "model_path": "/kaggle/input/senet-model-3/maxvit_base_tf_224_fixed_lr_scheduler_no_kidney/model_best_surface_dice.pth",
-    "batch_size": 8,
-    "num_workers": 4,
+    "classes": 2,
+    "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/maxvit_base_tf_224_kidney_3_sparse_replace_labels/model_best_surface_dice.pth",
+    "batch_size": 4,
+    "num_workers": 8,
     "threshold": 0.15,
 }
 if __name__ == "__main__":
