@@ -12,7 +12,15 @@ files = [f'{data_dir}/train/kidney_1_dense/labels/{i:04d}.tif' for i in
          range(len(os.listdir(f'{data_dir}/train/kidney_1_dense/labels/')))]
 
 model_dir = "seresnext101d_32x8d_pad_kidney_multiview"
-mask = np.load(f"/home/mithil/PycharmProjects/SenNetKideny/models/seresnext101d_32x8d_pad_kidney_multiview/volume.npz")['volume']
+mask = np.stack([cv2.imread(i,
+                            cv2.IMREAD_GRAYSCALE) for i in files])
+D, H, W = mask.shape
+stride = 2
+for d in tqdm(range(0, D, stride)):
+    for h in range(0, H, stride):
+        for w in range(0, W, stride):
+            if mask[d:d + 2, h:h + 2, w:w + 2].sum() == 1:
+                mask[d:d + 2, h:h + 2, w:w + 2] = 0
 
 # Create 3D visualization
 point1 = np.stack(np.where(mask > 0.1)).T
@@ -20,7 +28,7 @@ centroid = np.mean(mask, axis=0)
 
 pd1 = pv.PolyData(point1, )
 mesh1 = pd1.glyph(geom=pv.Cube())
-mesh1.save("kidney_2.vtk")
+mesh1.save("kidney_1_dense.vtk")
 # Set up the plotter and open a movie file
 filename = "kidney_visualization.mp4"
 plotter = pv.Plotter(window_size=[3840, 2160])

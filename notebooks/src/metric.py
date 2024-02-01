@@ -2,6 +2,7 @@ import torch
 import numpy as np
 import pandas as pd
 from torch import nn
+from tqdm import tqdm
 
 device = torch.device('cuda')  # can be 'cpu'
 torch_ver_major = int(torch.__version__.split('.')[0])
@@ -551,11 +552,9 @@ def compute_area(y: list, unfold: nn.Unfold, area: torch.Tensor) -> torch.Tensor
     yy = torch.stack(y, dim=0).to(torch.float16).unsqueeze(0)
     # (batch_size=1, nch=2, H, W) 
     # bit (0/1) but unfold requires float
-
     # unfold slides through the volume like a convolution
     # 2x2 kernel returns 8 values (2 channels * 2x2)
     cubes_float = unfold(yy).squeeze(0)  # (8, n_cubes)
-
     # Each of the 8 values are either 0 or 1
     # Convert those 8 bits to one uint8
     cubes_byte = torch.zeros(cubes_float.size(1), dtype=dtype_index, device=device)
@@ -564,7 +563,6 @@ def compute_area(y: list, unfold: nn.Unfold, area: torch.Tensor) -> torch.Tensor
 
     for k in range(8):
         cubes_byte += cubes_float[k, :].to(dtype_index) << k
-
     # Use area lookup table: pattern index -> area [float]
     cubes_area = area[cubes_byte]
 
@@ -619,7 +617,6 @@ def compute_surface_dice_score(submit: pd.DataFrame, label: pd.DataFrame) -> flo
         # Compute the surface area between two slices (n_cubes,)
         area_pred = compute_area([y0_pred, y1_pred], unfold, area)
         area_true = compute_area([y0, y1], unfold, area)
-
         # True positive cube indices
         idx = torch.logical_and(area_pred > 0, area_true > 0)
 

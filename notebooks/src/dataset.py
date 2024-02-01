@@ -54,6 +54,47 @@ class ImageDataset(Dataset):
         image_id = f"{folder_id}_{image_id}"
         return image, mask, image_id
 
+class ImageDatasetPseudo(Dataset):
+    def __init__(self, image_paths: List[str], transform: Compose, mask_volume: np.array,
+                 volume: np.array, mode: Literal["xy", "yz", "xz"] = "xy", ):
+        self.image_paths = image_paths
+        self.transform = transform
+        self.volume = volume
+        self.mode = mode
+        self.mask_volume = mask_volume
+
+    def __len__(self) -> int:
+        match self.mode:
+            case "xy":
+                return self.volume.shape[0]
+            case "xz":
+                return self.volume.shape[1]
+            case "yz":
+                return self.volume.shape[2]
+
+    def __getitem__(self, item) -> Tuple[torch.Tensor, torch.Tensor, str]:
+        match self.mode:
+            case "xy":
+                image = self.volume[item].astype(np.float32)
+                mask = self.mask_volume[item].astype(np.float32)
+            case "xz":
+                image = self.volume[:, item].astype(np.float32)
+                mask = self.mask_volume[:, item].astype(np.float32)
+            case "yz":
+                image = self.volume[:, :, item].astype(np.float32)
+                mask = self.mask_volume[:, :, item].astype(np.float32)
+            case _:
+                raise ValueError("Invalid mode")
+
+        image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
+
+        augmented = self.transform(image=image, mask=mask)
+        image = augmented["image"]
+        mask = augmented["mask"]
+        image_id = self.image_paths[item].split("/")[-1].split(".")[0]
+        folder_id = self.image_paths[item].split("/")[-3]
+        image_id = f"{folder_id}_{image_id}"
+        return image, mask, image_id
 
 class ImageDatasetOOF(Dataset):
     def __init__(self, image_paths: list, transform, volume: np.array,

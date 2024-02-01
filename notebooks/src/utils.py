@@ -215,3 +215,12 @@ def load_images_and_masks(directory: str, image_subdir: str, label_subdir: str, 
         volume = np.stack([cv2.imread(i, cv2.IMREAD_GRAYSCALE).astype(np.float16) for i in tqdm(images_full_path)])
 
         return images_full_path, labels_full_path, kidneys_rle, norm_by_percentile(volume)
+def load_images_and_masks_pseudo(directory: str, image_subdir: str):
+    image_dir = os.path.join(directory, image_subdir)
+    image_files = sorted(os.listdir(image_dir))
+
+    images_full_path = [os.path.join(image_dir, f) for f in image_files]
+    masks = np.load(f"{directory}/labels/volume.npy").astype(np.float16)
+    volume = np.stack([cv2.imread(i, cv2.IMREAD_GRAYSCALE).astype(np.float16) for i in tqdm(images_full_path)])
+
+    return images_full_path, norm_by_percentile(volume), masks

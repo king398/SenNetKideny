@@ -1,4 +1,4 @@
-from albumentations import Compose, CenterCrop
+from albumentations import Compose, CenterCrop, RandomBrightnessContrast,HorizontalFlip,VerticalFlip
 from albumentations.pytorch import ToTensorV2
 import torch
 from torchvision.transforms import v2
@@ -7,9 +7,9 @@ from torchvision.transforms import transforms as T
 
 def get_train_transform(height: int = 1344, width: int = 1120) -> Compose:
     return Compose([
-        # RandomBrightnessContrast(p=0.05,),
-        # HorizontalFlip(p=0.5),
-        # VerticalFlip(p=0.5),
+        RandomBrightnessContrast(p=0.05,),
+        HorizontalFlip(p=0.2),
+        VerticalFlip(p=0.2),
         ToTensorV2(transpose_mask=True), ])
 
 
@@ -26,7 +26,8 @@ def get_mosaic_2x2(four_images_batch):
         for j in range(2):
             im = cc(four_images_batch[i * 2 + j])
             final[:, i * h:i * h + h, j * w:j * w + w] = im
-    return torch.cat([four_images_batch,final.unsqueeze(0)])
+    return torch.cat([four_images_batch, final.unsqueeze(0)])
+
 
 def CutMix(images: torch.tensor, masks: torch.tensor):
     y = torch.randint(4, (images.shape[0],), dtype=torch.long)
