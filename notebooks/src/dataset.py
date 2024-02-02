@@ -7,7 +7,6 @@ from albumentations import Compose
 from typing import Tuple, List, Literal
 import torch
 import random
-from augmentations import random_scale
 
 
 class ImageDataset(Dataset):

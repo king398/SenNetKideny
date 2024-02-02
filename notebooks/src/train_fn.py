@@ -28,6 +28,7 @@ def train_fn(
         epoch: int,
         accelerator: Accelerator,
         fold: int,
+        ema
 
 ):
     gc.collect()
@@ -58,6 +59,7 @@ def train_fn(
 
             accelerator.log({f"train_loss_{fold}": loss_metric, f"train_dice_batch_{fold}": dice_batch.item(),
                              f"lr_{fold}": optimizer.param_groups[0]['lr']})
+            ema.module.update()
 
 
 def validation_fn(
@@ -68,6 +70,7 @@ def validation_fn(
         accelerator: Accelerator,
         labels_df: pd.DataFrame,
         model_dir: str,
+
 ):
     labels_df_new = labels_df.copy()
     # after the 900th keep all the rows
@@ -85,7 +88,7 @@ def validation_fn(
         for i, (images, masks, image_ids) in enumerate(stream):
 
             masks = masks.float()
-            images = images.float().to(accelerator.device)
+            images = images.float()
 
             output = model(images, )
             loss = criterion(output, masks)

@@ -7,9 +7,9 @@ from torchvision.transforms import transforms as T
 
 def get_train_transform(height: int = 1344, width: int = 1120) -> Compose:
     return Compose([
-        RandomBrightnessContrast(p=0.05,),
-        HorizontalFlip(p=0.2),
-        VerticalFlip(p=0.2),
+        #RandomBrightnessContrast(p=0.05,),
+        #HorizontalFlip(p=0.2),
+        #VerticalFlip(p=0.2),
         ToTensorV2(transpose_mask=True), ])
 
 

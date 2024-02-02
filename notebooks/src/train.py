@@ -14,6 +14,7 @@ import torch
 from train_fn import train_fn, validation_fn
 import argparse
 from segmentation_models_pytorch.losses import DiceLoss
+from ema_pytorch import EMA
 
 
 def main(cfg):
@@ -75,12 +76,20 @@ def main(cfg):
     scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=int(
         (len(train_loader) + len(train_loader_yz) + len(train_loader_xz)) * 10),
                                                                      eta_min=float(cfg['min_lr']))
-    (train_loader, valid_loader, model, optimizer, scheduler, train_loader_yz, train_loader_xz,
+    ema = EMA(
+        model,
+        beta=0.9999,  # exponential moving average factor
+        update_after_step=int((len(train_loader) + len(train_loader_yz) + len(train_loader_xz)) * 10),
+        # only after this number of .update() calls will it start updating
+        update_every=int((len(train_loader) + len(train_loader_yz) + len(train_loader_xz)) * 0.5),
+    )
+
+    (train_loader, valid_loader, model, optimizer, scheduler, train_loader_yz, train_loader_xz, ema
      ) = accelerate.prepare(
         train_loader,
         valid_loader,
         model,
-        optimizer, scheduler, train_loader_yz, train_loader_xz,
+        optimizer, scheduler, train_loader_yz, train_loader_xz, ema
     )
 
     criterion = DiceLoss(mode="multilabel")
@@ -99,12 +108,13 @@ def main(cfg):
             epoch=epoch,
             fold=0,
             accelerator=accelerate,
+            ema=ema
 
         )
 
         dice_score, surface_dice = validation_fn(
             valid_loader=valid_loader,
-            model=model,
+            model=model if epoch < 10 else ema,
             criterion=criterion,
             epoch=epoch,
             accelerator=accelerate,
@@ -124,6 +134,9 @@ def main(cfg):
             best_surface_dice = surface_dice
             accelerate.save(model_weights, f"{cfg['model_dir']}/model_best_surface_dice.pth")
             accelerate.print(f"Saved Model With Best Surface Dice Score {best_surface_dice}")
+            unwrapped_ema = accelerate.unwrap_model(ema)
+            ema_weights = unwrapped_ema.state_dict()
+            accelerate.save(ema_weights, f"{cfg['model_dir']}/ema_best_surface_dice.pth")
         if epoch == 3:
             accelerate.save(model_weights, f"{cfg['model_dir']}/model_epoch_{epoch}.pth")
         # accelerate.save(model_weights, f"{cfg['model_dir']}/model_last_epoch.pth")

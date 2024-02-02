@@ -126,7 +126,7 @@ def main(cfg: dict):
     global volume_uncompressed
     seed_everything(cfg['seed'])
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    test_dirs = ["/home/mithil/PycharmProjects/SenNetKideny/data/train/kidney_2", ]
+    test_dirs = ["/home/mithil/PycharmProjects/SenNetKideny/data/train/kidney_3_sparse", ]
     model = ReturnModel(cfg['model_name'], cfg['in_channels'], cfg['classes'], cfg['pad_factor'])
     model.to(device)
     model.load_state_dict(torch.load(cfg["model_path"], map_location=torch.device('cuda')))
@@ -172,14 +172,14 @@ def main(cfg: dict):
 
 config = {
     "seed": 42,
-    "model_name": "tu-timm/maxvit_base_tf_224.in1k",
+    "model_name": "tu-timm/dm_nfnet_f0.dm_in1k",
     "in_channels": 3,
-    "classes": 1,
+    "classes": 2,
     # "test_dir": '/kaggle/input/blood-vessel-segmentation/test',
-    "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/maxvit_base_tf_224_fixed_lr_scheduler_no_kidney/model_best_surface_dice.pth",
-    "batch_size": 2,
+    "model_path": "/home/mithil/PycharmProjects/SenNetKideny/models/dm_nfnet_f0_volume_normalize/model_best_surface_dice.pth",
+    "batch_size": 4,
     "num_workers": 8,
-    "pad_factor": 224,
+    "pad_factor": 32,
 }
 if __name__ == "__main__":
     main(config)
