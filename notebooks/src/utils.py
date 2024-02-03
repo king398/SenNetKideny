@@ -190,9 +190,8 @@ def norm_by_percentile(volume, low=10, high=99.8, alpha=0.01):
     xmin = np.percentile(volume, low)
     xmax = np.percentile(volume, high)
     x = (volume - xmin) / (xmax - xmin)
-    if 1:
-        x[x > 1] = (x[x > 1] - 1) * alpha + 1
-        x[x < 0] = (x[x < 0]) * alpha
+    x[x > 1] = (x[x > 1] - 1) * alpha + 1
+    x[x < 0] = (x[x < 0]) * alpha
     # x = np.clip(x,0,1)
     return x
 

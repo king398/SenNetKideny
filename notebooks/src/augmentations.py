@@ -1,15 +1,18 @@
-from albumentations import Compose, CenterCrop, RandomBrightnessContrast,HorizontalFlip,VerticalFlip
+import cv2
+from albumentations import Compose, CenterCrop, RandomBrightnessContrast, HorizontalFlip, VerticalFlip
 from albumentations.pytorch import ToTensorV2
 import torch
 from torchvision.transforms import v2
 from torchvision.transforms import transforms as T
+import numpy as np
+import albumentations as A
 
 
 def get_train_transform(height: int = 1344, width: int = 1120) -> Compose:
     return Compose([
-        #RandomBrightnessContrast(p=0.05,),
-        #HorizontalFlip(p=0.2),
-        #VerticalFlip(p=0.2),
+        # RandomBrightnessContrast(p=0.05,),
+        # HorizontalFlip(p=0.2),
+        # VerticalFlip(p=0.2),
         ToTensorV2(transpose_mask=True), ])
 
 
@@ -35,6 +38,21 @@ def CutMix(images: torch.tensor, masks: torch.tensor):
     cutmix = v2.CutMix(num_classes=4)
     cutmixed_images_masks, _ = cutmix(concat, y)
     return cutmixed_images_masks[:, 0:3], cutmixed_images_masks[:, 3:]
+
+
+def random_scale(image, mask, original_shape, scale_range=(0.8, 1.2)):
+    height, width = original_shape
+
+    transform = Compose([
+        A.RandomResizedCrop(height=height, width=width, scale=scale_range, p=0.3,interpolation=cv2.INTER_CUBIC),
+    ])
+
+    # Apply transformations
+    transformed = transform(image=image, mask=mask)
+    scaled_image = transformed['image']
+    scaled_mask = transformed['mask']
+
+    return scaled_image, scaled_mask
 
 
 def reverse_padding(image: int, original_height: int, original_width: int):

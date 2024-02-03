@@ -40,14 +40,14 @@ class ReturnModelUperNet(nn.Module):
         return x
 
 
-def _pad_image(x: torch.Tensor, pad_factor: int = 224):
+def _pad_image(x: torch.Tensor, pad_factor: int = 224, pad_value: int = 0):
     h, w = x.shape[2], x.shape[3]
     h_pad = (pad_factor - h % pad_factor) % pad_factor
     w_pad = (pad_factor - w % pad_factor) % pad_factor
 
     # Calculate padding
     pad = [w_pad // 2, w_pad - w_pad // 2, h_pad // 2, h_pad - h_pad // 2]
-    x = nn.functional.pad(x, pad, mode='constant', value=0)
+    x = nn.functional.pad(x, pad, mode='replicate')
     return x, pad
 
 
@@ -69,7 +69,7 @@ class ReturnModel(nn.Module):
 
     def forward(self, x):
         original_size = x.shape[2:]
-        x, pad = _pad_image(x, pad_factor=self.pad_factor)
+        x, pad = _pad_image(x, pad_factor=self.pad_factor, pad_value=x.min())
         x = checkpoint(self.unet.encoder, x, use_reentrant=True)
         x = self.unet.decoder(*x)
         x = self.unet.segmentation_head(x)

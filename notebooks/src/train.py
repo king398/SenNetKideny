@@ -14,7 +14,7 @@ import torch
 from train_fn import train_fn, validation_fn
 import argparse
 from segmentation_models_pytorch.losses import DiceLoss
-from ema_pytorch import EMA
+from torch.optim.swa_utils import AveragedModel, SWALR
 
 
 def main(cfg):
@@ -54,7 +54,7 @@ def main(cfg):
     train_dataset = ImageDataset(train_images, train_masks, get_train_transform(), train_kidneys_rle, train_volume,
                                  mode="xy")
     valid_dataset = ImageDataset(validation_images, validation_masks, get_valid_transform(),
-                                 validation_kidneys_rle, validation_volume, mode="xy")
+                                 validation_kidneys_rle, validation_volume, mode="xy",train=False)
     train_dataset_xz = ImageDataset(train_images_xz, train_masks_xz, get_train_transform(),
                                     train_xz_kidneys_rle, train_volume, mode="xz")
     train_dataset_yz = ImageDataset(train_images_yz, train_masks_yz, get_train_transform(),
@@ -73,23 +73,16 @@ def main(cfg):
                         pad_factor=cfg['pad_factor'], )
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=float(cfg['lr']))
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=int(
-        (len(train_loader) + len(train_loader_yz) + len(train_loader_xz)) * 10),
-                                                                     eta_min=float(cfg['min_lr']))
-    ema = EMA(
-        model,
-        beta=0.9999,  # exponential moving average factor
-        update_after_step=int((len(train_loader) + len(train_loader_yz) + len(train_loader_xz)) * 10),
-        # only after this number of .update() calls will it start updating
-        update_every=int((len(train_loader) + len(train_loader_yz) + len(train_loader_xz)) * 0.5),
-    )
+    scheduler = torch.optim.lr_scheduler.C(optimizer, max_lr=float(cfg['lr']), epochs=cfg['epochs'],
+                                                    steps_per_epoch=len(train_loader), pct_start=0.1, div_factor=10,
+                                                    final_div_factor=1)
 
-    (train_loader, valid_loader, model, optimizer, scheduler, train_loader_yz, train_loader_xz, ema
+    (train_loader, valid_loader, model, optimizer, scheduler, train_loader_yz, train_loader_xz,
      ) = accelerate.prepare(
         train_loader,
         valid_loader,
         model,
-        optimizer, scheduler, train_loader_yz, train_loader_xz, ema
+        optimizer, scheduler, train_loader_yz, train_loader_xz,
     )
 
     criterion = DiceLoss(mode="multilabel")
@@ -108,13 +101,12 @@ def main(cfg):
             epoch=epoch,
             fold=0,
             accelerator=accelerate,
-            ema=ema
 
         )
 
         dice_score, surface_dice = validation_fn(
             valid_loader=valid_loader,
-            model=model if epoch < 10 else ema,
+            model=model,
             criterion=criterion,
             epoch=epoch,
             accelerator=accelerate,
@@ -125,21 +117,13 @@ def main(cfg):
         accelerate.wait_for_everyone()
         unwrapped_model = accelerate.unwrap_model(model)
         model_weights = unwrapped_model.state_dict()
-        if dice_score > best_dice:
-            best_dice = dice_score
-
-            accelerate.save(model_weights, f"{cfg['model_dir']}/model.pth")
-            accelerate.print(f"Saved Model With Best Dice Score {best_dice}")
         if surface_dice > best_surface_dice:
             best_surface_dice = surface_dice
             accelerate.save(model_weights, f"{cfg['model_dir']}/model_best_surface_dice.pth")
             accelerate.print(f"Saved Model With Best Surface Dice Score {best_surface_dice}")
-            unwrapped_ema = accelerate.unwrap_model(ema)
-            ema_weights = unwrapped_ema.state_dict()
-            accelerate.save(ema_weights, f"{cfg['model_dir']}/ema_best_surface_dice.pth")
-        if epoch == 3:
-            accelerate.save(model_weights, f"{cfg['model_dir']}/model_epoch_{epoch}.pth")
-        # accelerate.save(model_weights, f"{cfg['model_dir']}/model_last_epoch.pth")
+        if epoch == 12:
+            accelerate.save(model_weights, f"{cfg['model_dir']}/model_epoch_12.pth")
+
     accelerate.end_training()
 
 

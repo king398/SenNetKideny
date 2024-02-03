@@ -28,7 +28,6 @@ def train_fn(
         epoch: int,
         accelerator: Accelerator,
         fold: int,
-        ema
 
 ):
     gc.collect()
@@ -59,7 +58,6 @@ def train_fn(
 
             accelerator.log({f"train_loss_{fold}": loss_metric, f"train_dice_batch_{fold}": dice_batch.item(),
                              f"lr_{fold}": optimizer.param_groups[0]['lr']})
-            ema.module.update()
 
 
 def validation_fn(
