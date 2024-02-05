@@ -43,11 +43,10 @@ class ImageDataset(Dataset):
         image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
         mask = cv2.imread(self.mask_paths[item], cv2.COLOR_BGR2GRAY)
         kidney_mask = cv2.imread(self.kidney_rle[item], cv2.COLOR_BGR2GRAY)
-        print(mask.shape, image.shape)
 
         augmented = self.transform(image=image, masks=[mask, kidney_mask])
         image = augmented["image"]
-        mask = np.dstack(augmented["masks"])/255
+        mask = torch.stack(augmented["masks"])/255
         image_id = self.image_paths[item].split("/")[-1].split(".")[0]
         folder_id = self.image_paths[item].split("/")[-3]
         image_id = f"{folder_id}_{image_id}"

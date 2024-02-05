@@ -10,6 +10,8 @@ from metric import compute_surface_dice_score
 from dataset import CombinedDataLoader
 from augmentations import get_mosaic_2x2, get_mosaic_2x2_8
 
+import warnings
+warnings.filterwarnings("ignore")
 
 dice = Dice()
 dice_valid = Dice_Valid()
@@ -30,9 +32,6 @@ def train_fn(
         accelerator: Accelerator,
         ema,
         fold: int,
-        swa_model,
-        swa_scheduler,
-        cfg
 
 ):
     gc.collect()
@@ -53,17 +52,15 @@ def train_fn(
             masks = get_mosaic_2x2_8(masks)
             qmin = 79.0
             qmax = 115.0
+
             output = model(images, qmin, qmax)
             loss = criterion(output, masks)
             optimizer.zero_grad()
             accelerator.backward(loss)
             optimizer.step()
             ema.update()
-            if epoch + 1 > cfg['swa_start']:
-                swa_model.update_parameters(model)
-                swa_scheduler.step()
-            else:
-                scheduler.step()
+
+            scheduler.step()
             outputs, masks = accelerator.gather_for_metrics((output, masks))
             loss_metric += loss.item() / (i + 1)
             dice_batch = dice(outputs, masks)
@@ -74,8 +71,6 @@ def train_fn(
                              f"lr_{fold}": optimizer.param_groups[0]['lr']})
 
     accelerator.log({f"f{fold}-train_lr": optimizer.param_groups[0]['lr']})
-    # if epoch + 1 == cfg['epochs']:
-    #     torch.optim.swa_utils.update_bn(stream, swa_model)
 
 
 def validation_fn(
@@ -85,8 +80,6 @@ def validation_fn(
         epoch: int,
         accelerator: Accelerator,
         labels_df: pd.DataFrame,
-        swa_model,
-        cfg,
         ema,
 ):
     gc.collect()
@@ -105,6 +98,7 @@ def validation_fn(
             with ema.average_parameters():
                 qmin = 74.0
                 qmax = 85.0
+
                 output = model(images, qmin, qmax)
                 loss = criterion(output, masks)
                 outputs, masks, = accelerator.gather((output, masks,))

@@ -6,6 +6,9 @@ from albumentations.pytorch import ToTensorV2
 from albumentations import Compose, CenterCrop
 import albumentations as A
 
+import torchvision
+torchvision.disable_beta_transforms_warning()
+
 
 def get_fit_transform():
     return Compose([

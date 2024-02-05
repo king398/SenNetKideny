@@ -10,7 +10,7 @@ min_lr: 3e-05
 swa_start: 20
 swa_lr: 3.7e-04
 model_dir: /home/lasupreme/Desktop/python/personal/KAGGLE-VS/SenNetKideny/models/EXP26
-model_name: timm-resnest14d
+model_name: tu-timm/maxvit_base_tf_224.in1k
 num_workers: 4
 pad_factor: 32
 seed: 42

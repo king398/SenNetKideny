@@ -21,8 +21,7 @@ from augmentations import get_fit_transform, get_val_transform
 from utils import seed_everything, write_yaml, load_images_and_masks
 
 import warnings
-
-warnings.filterwarnings("ignore")
+warnings.filterwarnings("ignore", category=UserWarning, message="_BETA_TRANSFORMS_WARNING")
 
 
 def main(cfg):
@@ -81,15 +80,11 @@ def main(cfg):
     # T_max = ceil(len(fit_images + fit_images_xz + fit_images_yz) /
     #              (cfg['num_devices'] * cfg['batch_size'])) * cfg['epochs']
     scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=T_max, eta_min=float(cfg['min_lr']))
-    swa_start = cfg['swa_start']
-    swa_model = AveragedModel(model)
-    swa_scheduler = SWALR(optimizer, swa_lr=cfg['swa_lr'], anneal_strategy='linear')
 
-    (fit_loader, val_loader, model, optimizer, scheduler, fit_loader_yz, fit_loader_xz, swa_model, swa_scheduler
+    (fit_loader, val_loader, model, optimizer, scheduler, fit_loader_yz, fit_loader_xz
      # fit_loader_3, fit_loader_3_yz, fit_loader_3_xz,
      ) = accelerate.prepare(
         fit_loader, val_loader, model, optimizer, scheduler, fit_loader_yz, fit_loader_xz,
-        swa_model, swa_scheduler
         # fit_loader_3, fit_loader_3_yz, fit_loader_3_xz
     )
 
@@ -112,9 +107,6 @@ def main(cfg):
             ema=ema,
             fold=0,
             accelerator=accelerate,
-            swa_model=swa_model,
-            swa_scheduler=swa_scheduler,
-            cfg=cfg
         )
 
         dice_score, surface_dice = validation_fn(
@@ -124,8 +116,6 @@ def main(cfg):
             epoch=epoch,
             accelerator=accelerate,
             labels_df=labels_df,
-            swa_model=swa_model,
-            cfg=cfg,
             ema=ema,
         )
         accelerate.wait_for_everyone()
