@@ -21,17 +21,15 @@ def apply_hysteresis_thresholding(volume: np.array, low: float, high: float, chu
     return predict
 
 
-def choose_biggest_object(mask: np.array, threshold: float) -> np.array:
+def choose_biggest_object(mask, threshold):
     mask = ((mask > threshold) * 255).astype(np.uint8)
-    num_label, label, stats, centroid = cv2.connectedComponentsWithStats(mask, connectivity=8)
-    max_label = -1
-    max_area = -1
-    for i in range(1, num_label):
-        if stats[i, cv2.CC_STAT_AREA] >= max_area:
-            max_area = stats[i, cv2.CC_STAT_AREA]
-            max_label = i
-    processed = (label == max_label).astype(np.uint8)
-    return processed
+    num_label, mask, stats, centroid = cv2.connectedComponentsWithStats(mask, connectivity=8)
+    max_label, max_area = -1, -1
+    for label in range(1, num_label):
+        if stats[label, cv2.CC_STAT_AREA] >= max_area:
+            max_area = stats[label, cv2.CC_STAT_AREA]
+            max_label = label
+    return (mask == max_label).astype(np.uint8)
 
 
 def rle_encode(mask: np.array) -> str:

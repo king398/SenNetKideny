@@ -200,8 +200,13 @@ def load_images_and_masks(cfg, kidney_name: str):
 
         desc = 'reading and stacking images in volume...'
         if kidney_name in cfg['cub1_path_percentile']:
-            volume = np.load(cfg['cub1_path_percentile']).squeeze(3).transpose(2, 0, 1)
+            # volume = np.load(cfg['cub1_path_percentile']).squeeze(3).transpose(2, 0, 1)
+            volume = np.load(cfg['cub1_path_percentile']).transpose(2, 0, 1)
+            volume = cv2.normalize(volume, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+
         else:
-            volume = np.load(cfg['cub3_path_percentile']).squeeze(3).transpose(2, 0, 1)
+            # volume = np.load(cfg['cub3_path_percentile']).squeeze(3).transpose(2, 0, 1)
+            volume = np.load(cfg['cub3_path_percentile']).transpose(2, 0, 1)
+            volume = cv2.normalize(volume, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
         # volume = np.stack([read_cv2(fp) for fp in tqdm(images_paths, total=len(images_paths), desc=desc)])
         return images_paths, masks_paths, kid_masks_paths, volume

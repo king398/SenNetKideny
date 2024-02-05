@@ -31,12 +31,14 @@ def norm_by_percentile(volume, low=10, high=99.8, alpha=0.01):
 
 
 class ImageDataset(Dataset):
-    def __init__(self, image_paths: list, transform, volume: np.array, pad_factor, mode: str = "xy", ):
+    def __init__(self, image_paths: list, transform, volume: np.array, q_min, q_max, pad_factor, mode: str = "xy", ):
         self.image_paths = image_paths
         self.transform = transform
         self.mode = mode
         self.volume = volume
         self.pad_factor = pad_factor
+        self.q_min = q_min / 255
+        self.q_max = q_max / 255
 
     def __len__(self) -> int:
         match self.mode:
@@ -69,6 +71,10 @@ class ImageDataset(Dataset):
         image_shape = image.shape
         image_shape = tuple(str(element) for element in image_shape)
 
-        image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
+        image = (np.dstack([image, image, image]) / 255).astype(np.float32)
         image = self.transform(image=image, H=int(image_shape[0]), W=int(image_shape[1]), pad_factor=self.pad_factor)
+        image = (image - self.q_min) / (self.q_max - self.q_min)
+        image[image > 1] = (image[image > 1] - 1) * 1e-2 + 1
+        image[image < 0] = (image[image < 0]) * 1e-2
+        image = (image - image.min()) / (image.max() - image.min())
         return image, image_shape, image_id

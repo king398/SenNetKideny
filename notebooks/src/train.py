@@ -98,7 +98,7 @@ def main(cfg):
     criterion = DiceLoss(mode="multilabel")
     # remove all the rows which do not contain kidney_3_dense in the id column
     labels_df = pd.read_csv(cfg['labels_df'])
-    # ema = ExponentialMovingAverage(model.parameters(), decay=0.995)
+    ema = ExponentialMovingAverage(model.parameters(), decay=0.995)
 
     for epoch in range(cfg['epochs']):
         train_fn(
@@ -109,6 +109,7 @@ def main(cfg):
             optimizer=optimizer,
             scheduler=scheduler,
             epoch=epoch,
+            ema=ema,
             fold=0,
             accelerator=accelerate,
             swa_model=swa_model,
@@ -125,7 +126,7 @@ def main(cfg):
             labels_df=labels_df,
             swa_model=swa_model,
             cfg=cfg,
-            # ema=ema,
+            ema=ema,
         )
         accelerate.wait_for_everyone()
         if epoch + 1 > cfg['swa_start']:

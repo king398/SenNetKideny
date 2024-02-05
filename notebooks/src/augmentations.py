@@ -4,14 +4,19 @@ from torchvision.transforms import v2
 from torchvision.transforms import transforms as T
 from albumentations.pytorch import ToTensorV2
 from albumentations import Compose, CenterCrop
+import albumentations as A
 
 
 def get_fit_transform():
     return Compose([
-        # RandomBrightnessContrast(p=0.05,),
-        # HorizontalFlip(p=0.5),
-        # VerticalFlip(p=0.5),
-        ToTensorV2(transpose_mask=True), ])
+        A.Rotate(limit=45, p=0.5),
+        A.RandomGamma(p=0.3),
+        A.RandomBrightnessContrast(p=0.5),
+        A.GaussianBlur(p=0.5),
+        A.MotionBlur(p=0.5),
+        A.GridDistortion(num_steps=5, distort_limit=0.3, p=0.5),
+        ToTensorV2(transpose_mask=True)
+    ])
 
 
 def get_val_transform() -> Compose:

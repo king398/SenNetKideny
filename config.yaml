@@ -1,18 +1,18 @@
-batch_size: 4
+batch_size: 16
 classes: 2
 epochs: 15
 gradient_accumulation_steps: 1
 in_channels: 3
 kidneys_df: /home/lasupreme/Desktop/python/personal/KAGGLE-VS/SenNetKideny/data/train_rles_kidneys.csv
 labels_df: /home/lasupreme/Desktop/python/personal/KAGGLE-VS/SenNetKideny/data/kidney_3_dense_full_self_encode.csv
-lr: 5e-04
+lr: 6e-04
 min_lr: 3e-05
-swa_start: 12
+swa_start: 20
 swa_lr: 3.7e-04
-model_dir: /home/lasupreme/Desktop/python/personal/KAGGLE-VS/SenNetKideny/models/EXP20
-model_name: tu-timm/maxvit_large_tf_224.in1k
+model_dir: /home/lasupreme/Desktop/python/personal/KAGGLE-VS/SenNetKideny/models/EXP26
+model_name: timm-resnest14d
 num_workers: 4
-pad_factor: 224
+pad_factor: 32
 seed: 42
 train_dir: /home/lasupreme/Desktop/python/personal/KAGGLE-VS/SenNetKideny/data/train/kidney_1_dense
 train_dir_2: /home/lasupreme/Desktop/python/personal/KAGGLE-VS/SenNetKideny/data/train/kidney_3_sparse
@@ -20,5 +20,8 @@ validation_dir: /home/lasupreme/Desktop/python/personal/KAGGLE-VS/SenNetKideny/d
 csv_image_mask_paths: '/home/lasupreme/Desktop/python/personal/KAGGLE-VS/SenNetKideny/data/train/final.csv'
 num_devices: 2
 
-cub1_path_percentile: /home/lasupreme/Desktop/python/personal/KAGGLE-VS/SenNetKideny/data/train/3d/3d_kidney_1_dense_image_percentile.npy
-cub3_path_percentile: /home/lasupreme/Desktop/python/personal/KAGGLE-VS/SenNetKideny/data/train/3d/3d_kidney_3_dense_image_percentile.npy
+#cub1_path_percentile: /home/lasupreme/Desktop/python/personal/KAGGLE-VS/SenNetKideny/data/train/3d/3d_kidney_1_dense_image_percentile.npy
+#cub3_path_percentile: /home/lasupreme/Desktop/python/personal/KAGGLE-VS/SenNetKideny/data/train/3d/3d_kidney_3_dense_image_percentile.npy
+
+cub1_path_percentile: /home/lasupreme/Desktop/python/personal/KAGGLE-VS/SenNetKideny/data/train/3d/3d_kidney_1_dense_image.npy
+cub3_path_percentile: /home/lasupreme/Desktop/python/personal/KAGGLE-VS/SenNetKideny/data/train/3d/3d_kidney_3_dense_image.npy

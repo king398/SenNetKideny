@@ -35,9 +35,13 @@ class ReturnModel(nn.Module):
         )
         self.pad_factor = pad_factor
 
-    def forward(self, x, inference: bool = False):
+    def forward(self, x, qmin, qmax, inference: bool = False):
         original_size = x.shape[2:]
         x, pad = self._pad_image(x, pad_factor=self.pad_factor)
+        x = (x - qmin) / (qmax - qmin)
+        x[x > 1] = (x[x > 1] - 1) * 0.01 + 1
+        x[x < 0] = (x[x < 0]) * 0.01
+        x = (x - x.min()) / (x.max() - x.min() + 0.0001)
         x = checkpoint(self.unet.encoder, x, use_reentrant=True)
 
         x = self.unet.decoder(*x)

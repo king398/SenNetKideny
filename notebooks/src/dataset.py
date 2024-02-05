@@ -41,14 +41,13 @@ class ImageDataset(Dataset):
                 raise ValueError("Invalid mode")
 
         image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
+        mask = cv2.imread(self.mask_paths[item], cv2.COLOR_BGR2GRAY)
+        kidney_mask = cv2.imread(self.kidney_rle[item], cv2.COLOR_BGR2GRAY)
+        print(mask.shape, image.shape)
 
-        mask = cv2.imread(self.mask_paths[item], cv2.COLOR_BGR2GRAY) / 255
-        kidney_mask = cv2.imread(self.kidney_rle[item], cv2.COLOR_BGR2GRAY) / 255
-        mask = np.stack([mask, kidney_mask], axis=2)
-
-        augmented = self.transform(image=image, mask=mask)
+        augmented = self.transform(image=image, masks=[mask, kidney_mask])
         image = augmented["image"]
-        mask = augmented["mask"]
+        mask = np.dstack(augmented["masks"])/255
         image_id = self.image_paths[item].split("/")[-1].split(".")[0]
         folder_id = self.image_paths[item].split("/")[-3]
         image_id = f"{folder_id}_{image_id}"
@@ -96,7 +95,7 @@ class ImageDatasetOOF(Dataset):
 
         image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
         image = image.astype("float")
-        image = (image - image.min()) / (image.max() - image.min() + 0.0001)
+        # image = (image - image.min()) / (image.max() - image.min() + 0.0001)
         image = self.transform(image=image)
         return image, image_shape, image_id
 
