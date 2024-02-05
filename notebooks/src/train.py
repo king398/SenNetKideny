@@ -14,14 +14,10 @@ from train_fn import train_fn, validation_fn
 from torch_ema import ExponentialMovingAverage
 from segmentation_models_pytorch.losses import DiceLoss
 
-from torch.optim.swa_utils import SWALR, AveragedModel
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 from accelerate import Accelerator, DistributedDataParallelKwargs
 from augmentations import get_fit_transform, get_val_transform
 from utils import seed_everything, write_yaml, load_images_and_masks
-
-import warnings
-warnings.filterwarnings("ignore", category=UserWarning, message="_BETA_TRANSFORMS_WARNING")
 
 
 def main(cfg):

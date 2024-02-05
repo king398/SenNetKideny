@@ -1,13 +1,13 @@
 import torch
+import torchvision
+import albumentations as A
+
+torchvision.disable_beta_transforms_warning()
 
 from torchvision.transforms import v2
 from torchvision.transforms import transforms as T
 from albumentations.pytorch import ToTensorV2
 from albumentations import Compose, CenterCrop
-import albumentations as A
-
-import torchvision
-torchvision.disable_beta_transforms_warning()
 
 
 def get_fit_transform():
@@ -39,7 +39,7 @@ def get_mosaic_2x2(four_images_batch):
     final = torch.zeros_like(four_images_batch[0])
     for i in range(2):
         for j in range(2):
-            im = cc(four_images_batch[i * 2 + j])   # takes a center crop of each image
+            im = cc(four_images_batch[i * 2 + j])  # takes a center crop of each image
             final[:, i * h:i * h + h, j * w:j * w + w] = im
     return torch.cat([four_images_batch, final.unsqueeze(0)])
 

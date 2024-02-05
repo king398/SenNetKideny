@@ -1,4 +1,4 @@
-batch_size: 16
+batch_size: 4
 classes: 2
 epochs: 15
 gradient_accumulation_steps: 1
@@ -12,7 +12,7 @@ swa_lr: 3.7e-04
 model_dir: /home/lasupreme/Desktop/python/personal/KAGGLE-VS/SenNetKideny/models/EXP26
 model_name: tu-timm/maxvit_base_tf_224.in1k
 num_workers: 4
-pad_factor: 32
+pad_factor: 224
 seed: 42
 train_dir: /home/lasupreme/Desktop/python/personal/KAGGLE-VS/SenNetKideny/data/train/kidney_1_dense
 train_dir_2: /home/lasupreme/Desktop/python/personal/KAGGLE-VS/SenNetKideny/data/train/kidney_3_sparse

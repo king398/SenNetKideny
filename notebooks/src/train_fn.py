@@ -48,10 +48,10 @@ def train_fn(
             images = images.float().contiguous()
             # images = get_mosaic_2x2(images)
             # masks = get_mosaic_2x2(masks)
-            images = get_mosaic_2x2_8(images)
-            masks = get_mosaic_2x2_8(masks)
-            qmin = 79.0
-            qmax = 115.0
+            # images = get_mosaic_2x2_8(images)
+            # masks = get_mosaic_2x2_8(masks)
+            qmin = 79.0/255
+            qmax = 115.0/255
 
             output = model(images, qmin, qmax)
             loss = criterion(output, masks)
@@ -96,8 +96,8 @@ def validation_fn(
             masks = masks.float()
             images = images.float().to(accelerator.device)
             with ema.average_parameters():
-                qmin = 74.0
-                qmax = 85.0
+                qmin = 74.0/255
+                qmax = 85.0/255
 
                 output = model(images, qmin, qmax)
                 loss = criterion(output, masks)
