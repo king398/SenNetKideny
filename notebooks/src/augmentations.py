@@ -10,9 +10,12 @@ import albumentations as A
 
 def get_train_transform(height: int = 1344, width: int = 1120) -> Compose:
     return Compose([
-        # RandomBrightnessContrast(p=0.05,),
-        # HorizontalFlip(p=0.2),
-        # VerticalFlip(p=0.2),
+        A.Rotate(limit=45, p=0.5),
+        A.RandomGamma(p=0.3),
+        A.RandomBrightnessContrast(p=0.5),
+        A.GaussianBlur(p=0.5),
+        A.MotionBlur(p=0.5),
+        A.GridDistortion(num_steps=5, distort_limit=0.3, p=0.5),
         ToTensorV2(transpose_mask=True), ])
 
 
@@ -40,7 +43,7 @@ def CutMix(images: torch.tensor, masks: torch.tensor):
     return cutmixed_images_masks[:, 0:3], cutmixed_images_masks[:, 3:]
 
 
-def random_scale(image, mask, original_shape, scale_range=(0.8, 1.2)):
+def random_scale(image, mask, original_shape, scale_range=(0.6, 1.2)):
     height, width = original_shape
 
     transform = Compose([

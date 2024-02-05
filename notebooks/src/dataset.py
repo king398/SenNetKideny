@@ -46,8 +46,6 @@ class ImageDataset(Dataset):
         mask = mask / 255
         kidney_mask = rle_decode(self.kidney_rle[item], img_shape=mask.shape)
         mask = np.stack([mask, kidney_mask], axis=2)
-        if self.train:
-            image, mask = random_scale(image, mask, original_shape=(image.shape[0], image.shape[1]))
 
         augmented = self.transform(image=image, mask=mask)
 

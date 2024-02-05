@@ -3,9 +3,9 @@ import warnings
 import yaml
 import pandas as pd
 from accelerate import Accelerator, DistributedDataParallelKwargs
-from utils import seed_everything, write_yaml, load_images_and_masks, load_images_and_masks_pseudo
+from utils import seed_everything, write_yaml, load_images_and_masks
 import gc
-from dataset import ImageDataset, ImageDatasetPseudo
+from dataset import ImageDataset
 from pathlib import Path
 from augmentations import get_train_transform, get_valid_transform
 from torch.utils.data import DataLoader
@@ -14,7 +14,6 @@ import torch
 from train_fn import train_fn, validation_fn
 import argparse
 from segmentation_models_pytorch.losses import DiceLoss
-from torch.optim.swa_utils import AveragedModel, SWALR
 
 
 def main(cfg):
@@ -73,9 +72,9 @@ def main(cfg):
                         pad_factor=cfg['pad_factor'], )
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=float(cfg['lr']))
-    scheduler = torch.optim.lr_scheduler.C(optimizer, max_lr=float(cfg['lr']), epochs=cfg['epochs'],
-                                                    steps_per_epoch=len(train_loader), pct_start=0.1, div_factor=10,
-                                                    final_div_factor=1)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=int(
+        (len(train_loader) + len(train_loader_yz) + len(train_loader_xz)) * 10),
+                                                                     eta_min=float(cfg['min_lr']))
 
     (train_loader, valid_loader, model, optimizer, scheduler, train_loader_yz, train_loader_xz,
      ) = accelerate.prepare(
@@ -93,7 +92,7 @@ def main(cfg):
 
     for epoch in range(cfg['epochs']):
         train_fn(
-            data_loader_list=[train_loader, train_loader_xz, train_loader_yz],
+            data_loader_list=[train_loader, train_loader_xz, train_loader_yz,valid_loader],
             model=model,
             criterion=criterion,
             optimizer=optimizer,

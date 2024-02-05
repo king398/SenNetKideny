@@ -47,7 +47,7 @@ def _pad_image(x: torch.Tensor, pad_factor: int = 224, pad_value: int = 0):
 
     # Calculate padding
     pad = [w_pad // 2, w_pad - w_pad // 2, h_pad // 2, h_pad - h_pad // 2]
-    x = nn.functional.pad(x, pad, mode='replicate')
+    x = nn.functional.pad(x, pad, mode='constant',value=0)
     return x, pad
 
 
